@@ -5,8 +5,7 @@
 架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1，登入用 Cloudflare Access。
 
 ## 目前分支
-- `main`：已 fast-forward 合併階段 1、2、編輯功能（78c55fd），未 push
-- `feature/ai-extract`：從 main 分出，階段 3
+- `main`：已 fast-forward 合併階段 1、2、編輯功能、階段 3 與設定文件，未 push
 - 流程約定：每完成一個功能就 commit；分支的功能做完就合回 main；push 需另外指示
 
 ## 階段
@@ -44,6 +43,8 @@
 
 ## 待決事項
 - 使用者需自備：Cloudflare 帳號、Anthropic API key、LINE Messaging API channel、家人 email 白名單
+- 申請與部署步驟見 `docs/setup/`（`cloudflare.md` → `anthropic.md` → `line.md`）；LINE 只需 Channel secret（secret 名稱 `LINE_CHANNEL_SECRET`），不需 access token
+- 未實測：pages.dev 上對 `/api/line/webhook` 建 Access Bypass app（備案：自訂網域或獨立 Worker）
 
 ## 階段 2 驗證（2026-10-08）
 - 本機 `wrangler pages dev` + Chrome：`/?text=這家好好吃 <IG連結>&url=<IG連結>` → 表單自動展開、連結與貼文文字正確帶入、網址列清掉 query；存檔後 DB `source=share`，表單 `source` 回到 `manual`；console 無錯誤
@@ -64,5 +65,5 @@
 - 要有 Cloudflare、Anthropic、LINE 三份申請步驟文件（`docs/setup/`）
 
 ## 下一步
-1. 撰寫 `docs/setup/` 三份申請步驟文件
-2. 階段 4 LINE Bot webhook
+1. 階段 4 LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）並背景跑 AI 擷取、處理 `unsend`（需在 `places` 加 LINE message id 欄位）
+2. 使用者照 `docs/setup/` 申請帳號後，部署並用真實金鑰驗證 AI 擷取與 Access
