@@ -26,12 +26,11 @@
 - 尚未驗證：實際部署、PWA 安裝、Cloudflare Access
 
 ## 資安約束（repo 預計公開）
-- 任何金鑰（Anthropic、LINE channel secret/token）只放 Cloudflare secret 或本機 `.dev.vars`，不進 repo
+- 任何金鑰（Anthropic、LINE channel secret/token）只放 Cloudflare secret 或本機 `.dev.vars`，不進 repo（`.gitignore` 已排除 `.dev.vars*`、`.env*`、`.wrangler/`）
 - API 本身沒有驗證，部署前必須先設好 Cloudflare Access，否則任何人都能讀寫；`/api/line/webhook` 例外，改驗 LINE 簽章
 - 測試資料只用虛構內容，不放家人真實資料或 email
 
 ## 待決事項
-- 需要 `.gitignore` 排除 `.wrangler/` 與 `.dev.vars`（本機金鑰檔），階段 3 放金鑰前必須完成 — 等使用者核准
 - 使用者需自備：Cloudflare 帳號、Anthropic API key、LINE Messaging API channel、家人 email 白名單
 
 ## 下一步

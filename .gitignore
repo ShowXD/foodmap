@@ -1,0 +1,10 @@
+# Wrangler local dev state
+.wrangler/
+
+# Local secrets for wrangler dev (API keys, LINE channel secret)
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+
+node_modules/
