@@ -5,11 +5,14 @@
 架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1，登入用 Cloudflare Access。
 
 ## 目前分支
-`feature/pwa-skeleton`（基於 `main` 6b2231f，階段 1 已 commit，未 push）
+- `feature/pwa-skeleton`：階段 1（76c6dcd）+ `.gitignore`（be45902），未 push、未合併 main
+- `feature/share-target`：從 be45902 分出，階段 2 已實作、尚未 commit
 
 ## 階段
 1. PWA 骨架 + 手動新增 + 搜尋 — **已實作、本機驗證通過**
-2. Web Share Target（Android 從 LINE 分享進來）— 未開始
+2. Web Share Target（Android 從 LINE 分享進來）— **已實作、本機驗證通過**，尚未在 Android 實機測
+   - manifest `share_target` GET 到 `/`；`app.js` 的 `prefillFromShare()` 從 url/text/title 抓第一個 http(s) 連結填入，其餘文字放貼文欄，`source=share`
+   - 注意：hidden input 設值會連預設值一起改，表單 reset 後必須手動設回 `manual`
 3. AI 擷取（抓 og 文字 → Claude Haiku 4.5 抽店名/食物/地區）— 未開始
 4. LINE Bot webhook 自動收連結（驗 `x-line-signature`）— 未開始
 
@@ -33,5 +36,10 @@
 ## 待決事項
 - 使用者需自備：Cloudflare 帳號、Anthropic API key、LINE Messaging API channel、家人 email 白名單
 
+## 階段 2 驗證（2026-10-08）
+- 本機 `wrangler pages dev` + Chrome：`/?text=這家好好吃 <IG連結>&url=<IG連結>` → 表單自動展開、連結與貼文文字正確帶入、網址列清掉 query；存檔後 DB `source=share`，表單 `source` 回到 `manual`；console 無錯誤
+- 本機 dev 注意：背景停止 wrangler 時 `workerd.exe` 可能殘留佔住 port 8788 且無回應，需手動結束
+
 ## 下一步
-使用者決定是否 commit 階段 1，然後做階段 2（manifest 加 `share_target`）。
+1. 使用者決定是否 commit 階段 2
+2. 階段 3、4 開工前需使用者決定的事項（見對話）與準備 Anthropic API key、LINE channel

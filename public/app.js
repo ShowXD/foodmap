@@ -74,6 +74,8 @@ addForm.addEventListener('submit', async (event) => {
   try {
     await api('POST', Object.fromEntries(new FormData(addForm)));
     addForm.reset();
+    // Setting a hidden input's value also changes its default, so reset() alone keeps 'share'.
+    addForm.elements.source.value = 'manual';
     formMessage.textContent = '已儲存';
     loadPlaces();
   } catch (error) {
@@ -82,6 +84,21 @@ addForm.addEventListener('submit', async (event) => {
     submitButton.disabled = false;
   }
 });
+
+// Android share target lands here as /?title=&text=&url=; LINE usually puts the link inside `text`.
+function prefillFromShare() {
+  const params = new URLSearchParams(location.search);
+  const sharedText = [params.get('url'), params.get('text'), params.get('title')].filter(Boolean).join(' ');
+  const sharedUrl = sharedText.match(/https?:\/\/\S+/)?.[0];
+  if (!sharedUrl) return;
+  addForm.elements.url.value = sharedUrl;
+  addForm.elements.caption.value = sharedText.replaceAll(sharedUrl, '').trim();
+  addForm.elements.source.value = 'share';
+  document.getElementById('add-panel').open = true;
+  history.replaceState(null, '', location.pathname);
+}
+
+prefillFromShare();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch((error) => console.error('Service worker registration failed', error));
