@@ -5,14 +5,17 @@
 架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1，登入用 Cloudflare Access。
 
 ## 目前分支
-- `feature/pwa-skeleton`：階段 1（76c6dcd）+ `.gitignore`（be45902），未 push、未合併 main
-- `feature/share-target`：從 be45902 分出，階段 2 已實作、尚未 commit
+- `main`：已 fast-forward 合併階段 1、2（6b6f2a2），未 push
+- `feature/edit-place`：從 main 分出，編輯功能
+- 流程約定：每完成一個功能就 commit；分支的功能做完就合回 main；push 需另外指示
 
 ## 階段
 1. PWA 骨架 + 手動新增 + 搜尋 — **已實作、本機驗證通過**
 2. Web Share Target（Android 從 LINE 分享進來）— **已實作、本機驗證通過**，尚未在 Android 實機測
    - manifest `share_target` GET 到 `/`；`app.js` 的 `prefillFromShare()` 從 url/text/title 抓第一個 http(s) 連結填入，其餘文字放貼文欄，`source=share`
    - 注意：hidden input 設值會連預設值一起改，表單 reset 後必須手動設回 `manual`
+2.5 編輯店家 — **已實作、本機驗證通過**
+   - 卡片「編輯」把資料帶入同一張表單（url 唯讀、hidden `id`），送出改走 PATCH；「取消編輯」還原表單
 3. AI 擷取（抓 og 文字 → Claude Haiku 4.5 抽店名/食物/地區）— 未開始
 4. LINE Bot webhook 自動收連結（驗 `x-line-signature`）— 未開始
 
@@ -40,6 +43,14 @@
 - 本機 `wrangler pages dev` + Chrome：`/?text=這家好好吃 <IG連結>&url=<IG連結>` → 表單自動展開、連結與貼文文字正確帶入、網址列清掉 query；存檔後 DB `source=share`，表單 `source` 回到 `manual`；console 無錯誤
 - 本機 dev 注意：背景停止 wrangler 時 `workerd.exe` 可能殘留佔住 port 8788 且無回應，需手動結束
 
+## 編輯功能驗證（2026-10-08）
+- 本機 `wrangler pages dev` + Chrome：按編輯 → 表單帶入既有資料、url 唯讀、按鈕變「更新」；改店名與地址送出 → DB 更新、url/source 不變、表單回到新增模式；取消編輯 → 表單清空並收合；console 無錯誤
+
+## 已定案的使用者決策
+- LINE Bot 不在群組發文字回覆；若 API 支援，對訊息加一個表情回應（待查證）
+- 家人會事先被告知群組有 Bot
+- 要有 Cloudflare、Anthropic、LINE 三份申請步驟文件（`docs/setup/`）
+
 ## 下一步
-1. 使用者決定是否 commit 階段 2
-2. 階段 3、4 開工前需使用者決定的事項（見對話）與準備 Anthropic API key、LINE channel
+1. 撰寫 `docs/setup/` 三份申請步驟文件（研究查證中）
+2. 階段 3 AI 擷取

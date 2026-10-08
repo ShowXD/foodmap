@@ -52,6 +52,9 @@ input, textarea, button {
 
 button { background: var(--accent); color: #fff; border: none; cursor: pointer; }
 button:disabled { opacity: 0.6; }
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+button[hidden] { display: none; }
+input:read-only { color: var(--muted); }
 
 #add-panel { margin-bottom: 16px; }
 #add-panel summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 8px 0; }

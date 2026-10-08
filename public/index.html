@@ -20,6 +20,7 @@
       <summary>＋ 新增一家店</summary>
       <form id="add-form">
         <input name="source" type="hidden" value="manual">
+        <input name="id" type="hidden" value="">
         <label>影片連結 <input name="url" type="url" required placeholder="https://www.instagram.com/reel/…"></label>
         <label>店名 <input name="name"></label>
         <label>食物 <input name="dishes" placeholder="牛肉麵、滷味"></label>
@@ -29,6 +30,7 @@
         <label>貼文文字 <textarea name="caption" rows="3"></textarea></label>
         <label>備註 <textarea name="note" rows="2"></textarea></label>
         <button type="submit">儲存</button>
+        <button id="cancel-edit" type="button" class="secondary" hidden>取消編輯</button>
         <p id="form-message" role="status"></p>
       </form>
     </details>
@@ -46,6 +48,7 @@
       <div class="actions">
         <a class="video" target="_blank" rel="noopener noreferrer">看影片</a>
         <a class="maps" target="_blank" rel="noopener noreferrer">導航</a>
+        <button class="edit secondary" type="button">編輯</button>
         <button class="toggle-status" type="button"></button>
       </div>
     </li>
