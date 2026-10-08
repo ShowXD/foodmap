@@ -1,7 +1,8 @@
 # Cloudflare 設定步驟
 
 美食地圖的網頁、API 和資料庫都放在 Cloudflare，登入由 Cloudflare Access 負責。
-三份設定文件請依這個順序做：**Cloudflare（本文件）→ [Anthropic](anthropic.md) → [LINE](line.md)**。LINE 需要用到這裡部署出來的網址。
+兩份設定文件請依這個順序做：**Cloudflare（本文件）→ [LINE](line.md)**。LINE 需要用到這裡部署出來的網址。
+「AI 自動填入」用的是 Cloudflare Workers AI 的免費額度，不需要另外申請 AI 帳號或金鑰。
 
 > ⚠️ **API 本身沒有登入檢查。** 第 6 步的 Access 沒設好之前，知道網址的人都能讀寫你們的清單。請一次做完第 1～6 步，中間不要把網址分享出去。
 
@@ -45,26 +46,36 @@ npx wrangler pages deploy
 - `pages deploy` 會依 `wrangler.toml` 的 `pages_build_output_dir` 上傳 `public/`，連同 `functions/` 一起部署。
 - 部署完會得到網址 `https://foodmap.pages.dev`。如果名字被用掉了，會是你自己取的專案名稱。
 
-## 4. 確認 D1 綁定
+## 4. 確認 D1 與 Workers AI 綁定
 
-`wrangler.toml` 已經宣告了 `DB` 綁定，用 `wrangler pages deploy` 部署會自動帶上。可以到控制台確認：
+`wrangler.toml` 已經宣告了 `DB`（D1）和 `AI`（Workers AI）兩個綁定，用 `wrangler pages deploy` 部署會自動帶上。可以到控制台確認：
 
-**Workers & Pages** → `foodmap` → **Settings** → **Bindings**，應該看到 D1 綁定 `DB` → `foodmap`。
+**Workers & Pages** → `foodmap` → **Settings** → **Bindings**，應該看到：
 
-如果沒有，就手動 **Add** → **D1 database bindings**，Variable name 填 `DB`，選 `foodmap`，然後**重新部署一次**（綁定在下次部署才會生效）。
+- D1 database：`DB` → `foodmap`
+- Workers AI：`AI`
+
+如果少了，就手動 **Add** 補上（D1 選 **D1 database bindings**、AI 選 **Workers AI**，Variable name 分別填 `DB`、`AI`），然後**重新部署一次**（綁定在下次部署才會生效）。
+
+### Workers AI 免費額度
+
+- 每天 10,000 neurons，UTC 00:00（台灣早上 8 點）重置。
+- 一次擷取約 70 neurons，**每天大約可以免費用 140 次**。
+- 免費方案超過額度時只會失敗、不會扣款，App 會顯示「AI 暫時無法使用」，手動填寫照常能用。
+- 用量可以在控制台的 **AI** → **Workers AI** 查看。
 
 ## 5. 設定金鑰（secret）
 
-金鑰只能放在 Cloudflare secret，**絕對不要寫進任何會被 commit 的檔案**。
+金鑰只能放在 Cloudflare secret，**絕對不要寫進任何會被 commit 的檔案**。目前只有 LINE 需要：
 
 ```bash
-npx wrangler pages secret put ANTHROPIC_API_KEY      # 取得方式見 anthropic.md
 npx wrangler pages secret put LINE_CHANNEL_SECRET    # 取得方式見 line.md
 ```
 
 指令會要你貼上值，輸入時不會顯示在畫面上。設定完再部署一次比較保險：`npx wrangler pages deploy`。
 
-> 本機開發要用金鑰時，放在 repo 根目錄的 `.dev.vars`（`.gitignore` 已排除），格式是 `ANTHROPIC_API_KEY=...`，一行一個。
+> 本機開發要用金鑰時，放在 repo 根目錄的 `.dev.vars`（`.gitignore` 已排除），格式是 `LINE_CHANNEL_SECRET=...`，一行一個。
+> **本機開發（`npx wrangler pages dev`）必須先 `npx wrangler login`。** `wrangler.toml` 裡的 AI 綁定一定要連到 Cloudflare，沒登入時 dev server 會直接啟動失敗，連清單功能都不能用。本機測試 AI 的用量也算在同一份免費額度裡。
 
 ## 6. 用 Cloudflare Access 限制只有家人能登入
 
@@ -140,5 +151,7 @@ npx wrangler pages deploy
 - D1 指令：<https://developers.cloudflare.com/workers/wrangler/commands/d1/>
 - Pages 指令：<https://developers.cloudflare.com/workers/wrangler/commands/pages/>
 - Pages 綁定：<https://developers.cloudflare.com/pages/functions/bindings/>
+- Workers AI 價格與免費額度：<https://developers.cloudflare.com/workers-ai/platform/pricing/>
+- Workers AI JSON 模式：<https://developers.cloudflare.com/workers-ai/features/json-mode/>
 - One-time PIN：<https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/>
 - Access 路徑規則：<https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/>

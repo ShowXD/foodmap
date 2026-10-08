@@ -15,10 +15,11 @@
    - 注意：hidden input 設值會連預設值一起改，表單 reset 後必須手動設回 `manual`
 2.5 編輯店家 — **已實作、本機驗證通過**
    - 卡片「編輯」把資料帶入同一張表單（url 唯讀、hidden `id`），送出改走 PATCH；「取消編輯」還原表單
-3. AI 擷取 — **已實作；本機驗證錯誤路徑通過，尚未用真實金鑰測擷取品質**
-   - `functions/api/extract.js`：POST `{url, caption}`；沒 caption 時只對 IG/FB 網域（`isSocialUrl`）抓 og:title/og:description；呼叫 `claude-haiku-4-5`（官方 SDK `@anthropic-ai/sdk`，structured outputs `output_config.format` json_schema）回傳 `{caption, fields}`
+3. AI 擷取 — **已實作；單元測試通過，尚未實測擷取品質（需登入 Cloudflare）**
+   - `functions/api/extract.js`：POST `{url, caption}`；沒 caption 時只對 IG/FB 網域（`isSocialUrl`）抓 og:title/og:description；用 Workers AI 綁定 `env.AI` 跑 `@cf/meta/llama-3.3-70b-instruct-fp8-fast`（JSON 模式 `response_format: json_schema`），`parseFields` 同時接受物件或 JSON 字串，回傳 `{caption, fields}`
+   - 決策（2026-10-08）：使用者不想付費，從 Claude Haiku 4.5（需預付儲值，無免費方案）改為 Workers AI 免費額度（每日 10,000 neurons，一次約 70）；已移除 `@anthropic-ai/sdk`，`docs/setup/anthropic.md` 刪除
    - 前端「✨ AI 自動填入」只填空白欄位，不覆蓋手打內容；422 時游標跳到貼文文字欄
-   - 依賴：`package.json` + `package-lock.json`（使用者已核准加入官方 SDK）；`npm test` 跑 `node --test`
+   - `package.json` 目前無相依套件，只保留 `npm test`（`node --test`）
 4. LINE Bot webhook 自動收連結（驗 `x-line-signature`）— 未開始
    - 已查證：LINE Messaging API **沒有**對訊息加表情回應的 API；Bot 將完全靜默（不回覆）
    - 要處理 `unsend` 事件：訊息被收回時刪除對應的已存連結
@@ -37,27 +38,27 @@
 - 尚未驗證：實際部署、PWA 安裝、Cloudflare Access
 
 ## 資安約束（repo 預計公開）
-- 任何金鑰（Anthropic、LINE channel secret/token）只放 Cloudflare secret 或本機 `.dev.vars`，不進 repo（`.gitignore` 已排除 `.dev.vars*`、`.env*`、`.wrangler/`）
+- 任何金鑰（LINE channel secret 等）只放 Cloudflare secret 或本機 `.dev.vars`，不進 repo（`.gitignore` 已排除 `.dev.vars*`、`.env*`、`.wrangler/`）
 - API 本身沒有驗證，部署前必須先設好 Cloudflare Access，否則任何人都能讀寫；`/api/line/webhook` 例外，改驗 LINE 簽章
 - 測試資料只用虛構內容，不放家人真實資料或 email
 
 ## 待決事項
-- 使用者需自備：Cloudflare 帳號、Anthropic API key、LINE Messaging API channel、家人 email 白名單
-- 申請與部署步驟見 `docs/setup/`（`cloudflare.md` → `anthropic.md` → `line.md`）；LINE 只需 Channel secret（secret 名稱 `LINE_CHANNEL_SECRET`），不需 access token
+- 使用者需自備：Cloudflare 帳號、LINE Messaging API channel、家人 email 白名單
+- 申請與部署步驟見 `docs/setup/`（`cloudflare.md` → `line.md`）；LINE 只需 Channel secret（secret 名稱 `LINE_CHANNEL_SECRET`），不需 access token
 - 未實測：pages.dev 上對 `/api/line/webhook` 建 Access Bypass app（備案：自訂網域或獨立 Worker）
 
 ## 階段 2 驗證（2026-10-08）
 - 本機 `wrangler pages dev` + Chrome：`/?text=這家好好吃 <IG連結>&url=<IG連結>` → 表單自動展開、連結與貼文文字正確帶入、網址列清掉 query；存檔後 DB `source=share`，表單 `source` 回到 `manual`；console 無錯誤
 - 本機 dev 注意：背景停止 wrangler 時 `workerd.exe` 可能殘留佔住 port 8788 且無回應，需手動結束
+- 本機 dev 注意：`wrangler.toml` 有 `[ai]` 綁定後，未 `wrangler login` 時 `wrangler pages dev` 會啟動失敗（"Failed to start the remote proxy session"，非互動環境需 `CLOUDFLARE_API_TOKEN`）；Pages 以 wrangler.toml 為設定來源，綁定不能只放控制台
 
 ## 編輯功能驗證（2026-10-08）
 - 本機 `wrangler pages dev` + Chrome：按編輯 → 表單帶入既有資料、url 唯讀、按鈕變「更新」；改店名與地址送出 → DB 更新、url/source 不變、表單回到新增模式；取消編輯 → 表單清空並收合；console 無錯誤
 
 ## 階段 3 驗證（2026-10-08）
-- `npm test`：7/7 通過（含 `test/extract.test.mjs`：網域白名單、og 解析與 HTML entity、缺金鑰 503、抓不到文字 422）
-- 本機 `wrangler pages dev --binding ANTHROPIC_API_KEY=<假金鑰>`：SDK 在 workerd 正常打包；假金鑰 → 502「AI 金鑰無效」；IG 測試連結抓不到文字 → 422；超過 5000 字 → 413
-- Chrome：按鈕在無輸入、抓不到文字、金鑰無效三種情況顯示正確訊息
-- 尚未驗證：真實金鑰下的擷取品質（需使用者提供 Anthropic API key）、真實 IG/FB 貼文能否抓到 og 文字
+- `npm test`：9/9 通過（`test/extract.test.mjs`：網域白名單、og 解析與 HTML entity、`parseFields`、缺 AI 綁定 503、抓不到文字 422、AI 成功 200／AI 拋錯 502，AI 以假物件替代）
+- 先前 Anthropic 版本曾在本機 wrangler + Chrome 驗證過抓不到文字 422、超長 413 與前端訊息；換成 Workers AI 後這些路徑程式未變
+- 尚未驗證：Workers AI 實際擷取繁體中文的品質（`wrangler pages dev --ai AI` 需登入 Cloudflare，本機目前未登入）、真實 IG/FB 貼文能否抓到 og 文字
 
 ## 已定案的使用者決策
 - LINE Bot 完全不回話（LINE 無表情回應 API，回貼圖會變成群組訊息）
@@ -66,4 +67,4 @@
 
 ## 下一步
 1. 階段 4 LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）並背景跑 AI 擷取、處理 `unsend`（需在 `places` 加 LINE message id 欄位）
-2. 使用者照 `docs/setup/` 申請帳號後，部署並用真實金鑰驗證 AI 擷取與 Access
+2. 使用者建好 Cloudflare 帳號並 `npx wrangler login` 後：用幾則真實貼文實測 Workers AI 擷取品質（繁中、店名準確度），不理想再評估換模型
