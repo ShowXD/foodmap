@@ -8,8 +8,8 @@ const placeTemplate = document.getElementById('place-template');
 const mapsUrl = (place) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '))}`;
 
-async function api(method, body, query = '') {
-  const response = await fetch(`/api/places${query}`, {
+async function api(method, body, query = '', path = '/api/places') {
+  const response = await fetch(`${path}${query}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -76,6 +76,31 @@ function resetForm() {
   addPanel.querySelector('summary').textContent = '＋ 新增一家店';
   cancelEditButton.hidden = true;
 }
+
+const aiFillButton = document.getElementById('ai-fill');
+aiFillButton.addEventListener('click', async () => {
+  const { url, caption } = addForm.elements;
+  if (!url.value.trim() && !caption.value.trim()) {
+    formMessage.textContent = '請先填影片連結或貼文文字';
+    return;
+  }
+  aiFillButton.disabled = true;
+  formMessage.textContent = 'AI 擷取中…';
+  try {
+    const extracted = await api('POST', { url: url.value, caption: caption.value }, '', '/api/extract');
+    caption.value = extracted.caption;
+    // Only fill blanks so AI never overwrites what someone typed by hand.
+    for (const [field, text] of Object.entries(extracted.fields)) {
+      if (text && !addForm.elements[field].value.trim()) addForm.elements[field].value = text;
+    }
+    formMessage.textContent = 'AI 已填入，請確認後再儲存';
+  } catch (error) {
+    formMessage.textContent = error.message;
+    if (error.status === 422) caption.focus();
+  } finally {
+    aiFillButton.disabled = false;
+  }
+});
 
 cancelEditButton.addEventListener('click', () => {
   resetForm();

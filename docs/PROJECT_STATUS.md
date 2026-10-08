@@ -5,8 +5,8 @@
 架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1，登入用 Cloudflare Access。
 
 ## 目前分支
-- `main`：已 fast-forward 合併階段 1、2（6b6f2a2），未 push
-- `feature/edit-place`：從 main 分出，編輯功能
+- `main`：已 fast-forward 合併階段 1、2、編輯功能（78c55fd），未 push
+- `feature/ai-extract`：從 main 分出，階段 3
 - 流程約定：每完成一個功能就 commit；分支的功能做完就合回 main；push 需另外指示
 
 ## 階段
@@ -16,8 +16,14 @@
    - 注意：hidden input 設值會連預設值一起改，表單 reset 後必須手動設回 `manual`
 2.5 編輯店家 — **已實作、本機驗證通過**
    - 卡片「編輯」把資料帶入同一張表單（url 唯讀、hidden `id`），送出改走 PATCH；「取消編輯」還原表單
-3. AI 擷取（抓 og 文字 → Claude Haiku 4.5 抽店名/食物/地區）— 未開始
+3. AI 擷取 — **已實作；本機驗證錯誤路徑通過，尚未用真實金鑰測擷取品質**
+   - `functions/api/extract.js`：POST `{url, caption}`；沒 caption 時只對 IG/FB 網域（`isSocialUrl`）抓 og:title/og:description；呼叫 `claude-haiku-4-5`（官方 SDK `@anthropic-ai/sdk`，structured outputs `output_config.format` json_schema）回傳 `{caption, fields}`
+   - 前端「✨ AI 自動填入」只填空白欄位，不覆蓋手打內容；422 時游標跳到貼文文字欄
+   - 依賴：`package.json` + `package-lock.json`（使用者已核准加入官方 SDK）；`npm test` 跑 `node --test`
 4. LINE Bot webhook 自動收連結（驗 `x-line-signature`）— 未開始
+   - 已查證：LINE Messaging API **沒有**對訊息加表情回應的 API；Bot 將完全靜默（不回覆）
+   - 要處理 `unsend` 事件：訊息被收回時刪除對應的已存連結
+   - 群組內 Bot 會收到所有訊息，只保存比對到的 IG/FB 連結，其餘不存
 
 ## 階段 1 內容
 - `schema.sql`：`places` 表（url UNIQUE、status 限 todo/visited）
@@ -46,11 +52,17 @@
 ## 編輯功能驗證（2026-10-08）
 - 本機 `wrangler pages dev` + Chrome：按編輯 → 表單帶入既有資料、url 唯讀、按鈕變「更新」；改店名與地址送出 → DB 更新、url/source 不變、表單回到新增模式；取消編輯 → 表單清空並收合；console 無錯誤
 
+## 階段 3 驗證（2026-10-08）
+- `npm test`：7/7 通過（含 `test/extract.test.mjs`：網域白名單、og 解析與 HTML entity、缺金鑰 503、抓不到文字 422）
+- 本機 `wrangler pages dev --binding ANTHROPIC_API_KEY=<假金鑰>`：SDK 在 workerd 正常打包；假金鑰 → 502「AI 金鑰無效」；IG 測試連結抓不到文字 → 422；超過 5000 字 → 413
+- Chrome：按鈕在無輸入、抓不到文字、金鑰無效三種情況顯示正確訊息
+- 尚未驗證：真實金鑰下的擷取品質（需使用者提供 Anthropic API key）、真實 IG/FB 貼文能否抓到 og 文字
+
 ## 已定案的使用者決策
-- LINE Bot 不在群組發文字回覆；若 API 支援，對訊息加一個表情回應（待查證）
+- LINE Bot 完全不回話（LINE 無表情回應 API，回貼圖會變成群組訊息）
 - 家人會事先被告知群組有 Bot
 - 要有 Cloudflare、Anthropic、LINE 三份申請步驟文件（`docs/setup/`）
 
 ## 下一步
-1. 撰寫 `docs/setup/` 三份申請步驟文件（研究查證中）
-2. 階段 3 AI 擷取
+1. 撰寫 `docs/setup/` 三份申請步驟文件
+2. 階段 4 LINE Bot webhook
