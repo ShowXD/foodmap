@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#d9480f">
+  <title>美食地圖</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>美食地圖</h1>
+    <input id="search" type="search" placeholder="搜尋店名、食物、地區、標籤…" aria-label="搜尋">
+  </header>
+
+  <main>
+    <details id="add-panel">
+      <summary>＋ 新增一家店</summary>
+      <form id="add-form">
+        <label>影片連結 <input name="url" type="url" required placeholder="https://www.instagram.com/reel/…"></label>
+        <label>店名 <input name="name"></label>
+        <label>食物 <input name="dishes" placeholder="牛肉麵、滷味"></label>
+        <label>地區 <input name="area" placeholder="台北 大安"></label>
+        <label>地址 <input name="address"></label>
+        <label>標籤 <input name="tags" placeholder="宵夜 平價"></label>
+        <label>貼文文字 <textarea name="caption" rows="3"></textarea></label>
+        <label>備註 <textarea name="note" rows="2"></textarea></label>
+        <button type="submit">儲存</button>
+        <p id="form-message" role="status"></p>
+      </form>
+    </details>
+
+    <p id="list-message" role="status"></p>
+    <ul id="place-list"></ul>
+  </main>
+
+  <template id="place-template">
+    <li class="place">
+      <h2 class="name"></h2>
+      <p class="dishes"></p>
+      <p class="meta"></p>
+      <p class="note"></p>
+      <div class="actions">
+        <a class="video" target="_blank" rel="noopener noreferrer">看影片</a>
+        <a class="maps" target="_blank" rel="noopener noreferrer">導航</a>
+        <button class="toggle-status" type="button"></button>
+      </div>
+    </li>
+  </template>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

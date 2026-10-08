@@ -1,0 +1,85 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fffaf5;
+  --card: #ffffff;
+  --text: #212529;
+  --muted: #6c757d;
+  --accent: #d9480f;
+  --border: #e9ecef;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a1a;
+    --card: #262626;
+    --text: #f1f3f5;
+    --muted: #adb5bd;
+    --accent: #ff8a50;
+    --border: #3a3a3a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Noto Sans TC", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  position: sticky;
+  top: 0;
+  padding: 12px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+h1 { margin: 0 0 8px; font-size: 1.25rem; color: var(--accent); }
+
+main { max-width: 640px; margin: 0 auto; padding: 16px; }
+
+input, textarea, button {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+}
+
+button { background: var(--accent); color: #fff; border: none; cursor: pointer; }
+button:disabled { opacity: 0.6; }
+
+#add-panel { margin-bottom: 16px; }
+#add-panel summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 8px 0; }
+#add-form { display: grid; gap: 10px; }
+#add-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+
+#list-message, #form-message { color: var(--muted); margin: 8px 0; }
+
+#place-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+
+.place {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.place.visited { opacity: 0.6; }
+.place h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.place p { margin: 2px 0; }
+.place p:empty { display: none; }
+.place .meta, .place .note { color: var(--muted); font-size: 0.9rem; }
+
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+.actions a, .actions button {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.actions a { border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
