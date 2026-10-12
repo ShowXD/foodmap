@@ -46,7 +46,7 @@
   - `lib/users.js`：首次登入建 pending；`ADMIN_EMAILS` 內的 email 自動成為已核准管理員（不用「第一個登入者當管理員」，避免陌生人搶先）
   - `functions/_middleware.js`：只放行 `/api/line/webhook`；缺 `ACCESS_TEAM_DOMAIN`/`ACCESS_AUD` → 503（fail closed）；JWT 無效 → 401；非 approved → 網頁 302 `/pending`、API 403（只放行 `/pending`、`/api/me`、`/icon.svg`）；`DEV_USER_EMAIL` 只在 localhost 生效
   - `functions/api/me.js`（目前登入者）、`functions/api/users.js`（管理員限定 GET/PATCH，禁止停用或降級自己）；`public/pending.html`、`public/admin.html`；主頁右上顯示 email、管理、登出（`/cdn-cgi/access/logout`）
-  - 部署需設 secret：`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`（正式,預覽 兩個 AUD）、`ADMIN_EMAILS`；可刪除舊的 `FAMILY_PASSWORD`、`SESSION_SECRET`
+  - 部署需設 secret：`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`（單一應用程式的 AUD；程式也接受逗號分隔的多個）、`ADMIN_EMAILS`；可刪除舊的 `FAMILY_PASSWORD`、`SESSION_SECRET`
   - `/api/line/webhook` 需在 Access 另建 Bypass app（pages.dev 上可行性未實測），安全性靠 LINE 簽章
 - 測試資料只用虛構內容，不放家人真實資料或 email
 
