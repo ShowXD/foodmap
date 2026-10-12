@@ -50,7 +50,9 @@
 ## 待決事項
 - 使用者需自備：Cloudflare 帳號、LINE Messaging API channel、家人 email 白名單
 - 申請與部署步驟見 `docs/setup/`（`cloudflare.md` → `line.md`）；LINE 只需 Channel secret（secret 名稱 `LINE_CHANNEL_SECRET`），不需 access token
-- 已部署：Pages 專案名 `foodmap-edl`（`foodmap` 已被占用），正式網址 `https://foodmap-edl.pages.dev`；D1 已建立並套用 schema（使用者 2026-10-12 操作）。部署時尚未有登入功能，網站曾短暫公開（無真實資料）；登入功能合併後需重新部署並設定 `FAMILY_PASSWORD`、`SESSION_SECRET`
+- 已部署：Pages 專案名 `foodmap-edl`（`foodmap` 已被占用），正式網址 `https://foodmap-edl.pages.dev`；D1 已建立並套用 schema（使用者 2026-10-12 操作）
+- 登入已上線（2026-10-12 驗證）：使用者已設 `FAMILY_PASSWORD`、`SESSION_SECRET` 並重新部署；正式網址與新部署網址未登入時 `/` 302 → `/login`、`/api/places` 401
+- 資安事件（已處理）：無登入的舊部署 `b313a776.foodmap-edl.pages.dev` 仍可免登入讀寫正式 D1（Pages 永久保留每次部署）；使用者已刪除，驗證回 404；當時 DB 無資料。規則：資安修正部署後必須刪除修正前的舊部署（寫在 `docs/setup/cloudflare.md`）
 - 本機 `npm run dev` 需帳號已註冊 workers.dev 子網域（AI 遠端綁定要求），使用者尚未註冊；`wrangler.toml` 的 `database_id` 使用者已在本機填入，尚未決定是否 commit（目前未 commit）
 
 ## 階段 2 驗證（2026-10-08）

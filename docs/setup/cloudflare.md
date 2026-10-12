@@ -157,10 +157,26 @@ curl -si -X POST https://foodmap.pages.dev/api/line/webhook | head -5
 ## 之後更新程式
 
 ```bash
-npx wrangler pages deploy
+npm run deploy
 ```
 
 資料表結構有變動時，要再對 `--remote` 執行一次對應的 SQL。
+
+### ⚠️ 修正資安問題後，要刪掉舊部署
+
+Cloudflare Pages 會**永久保留每一次部署**，每個部署都有自己的網址（`<編號>.<專案>.pages.dev`），而且全部連著**同一個正式資料庫**。部署新版時，正式網址會改指向新版，但舊網址照樣能開，跑的是當時的舊程式。
+
+所以只要修的是資安問題（例如登入、權限、輸入檢查），部署後一定要刪掉修正前的所有舊部署，否則別人可以透過舊網址繞過修正。其他沒用的舊部署也可以一起刪，留著沒有好處。
+
+- 控制台：**Workers & Pages** → 專案 → **Deployments** → 舊部署右邊 **⋯** → **Delete deployment**
+- 指令：
+
+  ```bash
+  npx wrangler pages deployment list --project-name <專案名稱>
+  npx wrangler pages deployment delete <部署ID> --project-name <專案名稱>
+  ```
+
+刪除後無法復原。目前的正式部署不能刪，不用擔心刪錯。
 
 ## 參考文件
 
