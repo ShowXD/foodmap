@@ -123,7 +123,23 @@
 - 驗證：`npm test` 27/27；scratch 本機 wrangler 確認回應帶 CSP/XFO/nosniff、`/api/*` no-store、跨站 POST 403、同站 POST 201；Chrome 在 CSP 下主頁新增店家、管理頁、成員頁皆正常，嵌入 iframe 被 frame-ancestors 擋下
 - Access 登入有效期預設 24 小時，文件已說明可調至最長 1 個月與遺失手機時撤銷工作階段
 
+## LINE Bot（2026-10-12，已實作、本機驗證；尚未在 LINE 實際串接）
+- `functions/api/line/webhook.js`：驗 `x-line-signature`（HMAC-SHA256，`LINE_CHANNEL_SECRET`，無 secret → 503、簽章錯 → 401）；回 200 後在 `waitUntil` 依序處理事件；完全不回話
+  - `join`／群組訊息會記錄到 `line_groups`；**只有網站管理員綁定到群組清單的 LINE 群組才收連結**（外人把 Bot 拉進別的群組無效）；1:1 聊天忽略
+  - 每則訊息最多 3 個 IG/FB 連結（`parseLinks`，用 `isSocialUrl`），同則訊息其餘文字當 caption，無文字才嘗試抓 og；AI（`extractPlaces`，與表單共用）每家店一筆，`source='line'`、`line_message_id`；AI 失敗／額度用完／找不到店也存一筆只有連結的紀錄
+  - 重送去重（同 message id + url 跳過）；同清單同 url 同店名不重複
+  - `unsend` 刪除該訊息存下的店家
+  - LINE 自動分析每日上限 50（以當日 `source='line'` 的不同訊息連結數計），超過只存連結
+- `functions/api/line-groups.js`：網站管理員限定 GET／PATCH 綁定（只能綁群組清單，不能綁個人清單）；`public/admin.html`/`admin.js` 新增「LINE 群組」區塊
+- `extract.js` 抽出 `extractPlaces`、匯出 `fetchCaption` 供 webhook 共用
+- 升級：`migrations/0006_line.sql`（`places.line_message_id`、`line_groups`）
+- 驗證：`npm test` 34/34（`test/line.test.mjs` 7 項：簽章、連結解析、未綁定不存、多店存入與重送去重、AI 失敗存連結、收回刪除與忽略 1:1／非社群連結、綁定 API 權限）；scratch 本機 wrangler 實送簽章 webhook：偽造 401、空事件 200、未綁定只記錄群組、管理 API 綁定後存入家人清單（本機無 AI → 只存連結＋訊息文字）、unsend 刪除；Chrome 管理頁綁定／解除綁定正常
+- 未驗證：pages.dev 上 webhook 路徑的 Access Bypass app、LINE Verify、正式環境 AI 對群組貼文的擷取品質
+- 設定步驟見 `docs/setup/line.md`
+
 ## 下一步
 1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
-3. 路線圖：Google 地圖、LINE Bot
+3. 使用者照 `docs/setup/line.md` 申請 LINE、設 `LINE_CHANNEL_SECRET`、跑 0006、部署、建 webhook Bypass app、設 Webhook URL、拉 Bot 進群組並在管理頁綁定「家人」，實測擷取品質
+4. 待決：登入是否加密碼方式（使用者保留選擇：A 外接 Auth0 類服務經 Access OIDC／B 自建／C 維持 OTP + Google）
+5. 路線圖：Google 地圖

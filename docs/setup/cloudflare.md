@@ -158,13 +158,9 @@ npm run deploy
 
 ### 5-4 讓 LINE webhook 路徑繞過 Access
 
-LINE 伺服器沒辦法登入，所以 `/api/line/webhook` 要另開一個應用程式放行。安全性改由程式驗證 LINE 簽章把關。
+等設定 LINE Bot 時再做，步驟與驗證方式見 [line.md 第 6 步](line.md#6-讓-webhook-路徑繞過-access)。
 
-1. **Zero Trust** → **Access controls** → **Applications** → **Create new application** → **Self-hosted and private**
-2. Public hostname 填 `<專案>.pages.dev`，**Path** 填 `api/line/webhook`（下拉選單選不到 pages.dev 時，試試 **Switch to custom input**）
-3. Policy：Action 選 **Bypass**，Include 選 **Everyone**
-
-> ⚠️ 未驗證：在 pages.dev 上用 UI 建單一路徑的 Bypass 還沒實測過，等 LINE Bot 完成後再測。不行的話，備案是改用自訂網域。
+> ⚠️ 未驗證：在 pages.dev 上用 UI 建單一路徑的 Bypass 還沒實測過。不行的話，備案是改用自訂網域。
 
 ### 5-5 設定程式需要的值
 
@@ -269,6 +265,7 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0003_users.sql` | 新增 `users` 表（個人帳號） | 還沒有 `users` 表的資料庫 |
 | `0004_lists.sql` | 個人清單與群組清單；舊店家搬進「家人」群組；取消審核 | 跑過 0003、還沒有 `lists` 表的資料庫 |
 | `0005_extract_usage.sql` | AI 擷取每人每日次數紀錄（上限 30 次） | 還沒有 `extract_usage` 表的資料庫 |
+| `0006_line.sql` | LINE Bot：記錄店家來自哪則 LINE 訊息、Bot 加入的群組 | 還沒有 `line_groups` 表的資料庫 |
 
 全新建立的資料庫只要跑 `schema.sql`，它已經是最新結構，不用再跑 `migrations/`。
 

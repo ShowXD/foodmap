@@ -46,6 +46,38 @@ function userButton(label, changes, user) {
   return button;
 }
 
+const lineGroupList = document.getElementById('line-group-list');
+
+function renderLineGroups(lineGroups, groupLists) {
+  if (lineGroups.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'meta';
+    empty.textContent = '還沒有群組。把 Bot 拉進 LINE 群組並在群組裡發一則訊息後，重新整理這頁。';
+    lineGroupList.replaceChildren(empty);
+    return;
+  }
+  lineGroupList.replaceChildren(...lineGroups.map((group) => {
+    const lastSeen = group.last_message_at ? `最後訊息 ${group.last_message_at}` : `加入於 ${group.first_seen_at}`;
+    const { item, actions } = card(`LINE 群組 …${group.group_id.slice(-6)}`, `${group.list_name ? `收進「${group.list_name}」` : '未綁定（不收連結）'} · ${lastSeen} (UTC)`);
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', '綁定到清單');
+    select.append(new Option('不收連結', ''), ...groupLists.map((list) => new Option(`收進「${list.name}」`, list.id)));
+    select.value = group.list_id ? String(group.list_id) : '';
+    select.addEventListener('change', async () => {
+      select.disabled = true;
+      try {
+        await api('/api/line-groups', 'PATCH', { group_id: group.group_id, list_id: select.value ? Number(select.value) : null });
+        await load();
+      } catch (error) {
+        message.textContent = `綁定失敗：${error.message}`;
+        select.disabled = false;
+      }
+    });
+    actions.append(select);
+    return item;
+  }));
+}
+
 async function load() {
   const me = await api('/api/me');
   if (!me.isAdmin) {
@@ -53,7 +85,8 @@ async function load() {
     createGroupForm.hidden = true;
     return;
   }
-  const [users, lists] = await Promise.all([api('/api/users'), api('/api/lists')]);
+  const [users, lists, lineGroups] = await Promise.all([api('/api/users'), api('/api/lists'), api('/api/line-groups')]);
+  renderLineGroups(lineGroups, lists.filter((list) => !list.is_personal));
   message.textContent = `${users.length} 個帳號、${lists.filter((list) => !list.is_personal).length} 個群組`;
 
   groupList.replaceChildren(...lists.filter((list) => !list.is_personal).map((list) => {

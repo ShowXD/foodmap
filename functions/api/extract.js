@@ -67,7 +67,7 @@ export function parseOgText(html) {
   return [...new Set([read('og:title'), read('og:description')].filter(Boolean))].join('\n');
 }
 
-async function fetchCaption(url) {
+export async function fetchCaption(url) {
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'facebookexternalhit/1.1', 'Accept-Language': 'zh-TW,zh;q=0.9' },
@@ -134,9 +134,18 @@ export async function onRequestPost({ request, env, data }) {
     return json({ error: `今天的 AI 擷取已達 ${DAILY_EXTRACT_LIMIT} 次上限，請手動填寫或明天再試` }, 429);
   }
 
+  const { places, error } = await extractPlaces(env.AI, caption);
+  if (error === 'unavailable') return json({ error: 'AI 暫時無法使用（可能已達今日免費額度），請手動填寫' }, 502);
+  if (error === 'unusable') return json({ error: 'AI 回傳格式錯誤，請手動填寫' }, 502);
+  if (places.length === 0) return json({ error: 'AI 在貼文裡找不到店家，請手動填寫' }, 422);
+  return json({ caption, places });
+}
+
+/** Shared by the form and the LINE webhook. Returns { places } or { error: 'unavailable' | 'unusable' }. */
+export async function extractPlaces(ai, caption) {
   let result;
   try {
-    result = await env.AI.run(MODEL, {
+    result = await ai.run(MODEL, {
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `<post>\n${caption}\n</post>` },
@@ -147,16 +156,14 @@ export async function onRequestPost({ request, env, data }) {
   } catch (error) {
     // Covers the daily free-neuron limit and "JSON Mode couldn't be met".
     console.error('Workers AI error', error.message);
-    return json({ error: 'AI 暫時無法使用（可能已達今日免費額度），請手動填寫' }, 502);
+    return { error: 'unavailable' };
   }
-
   const places = parsePlaces(result?.response);
   if (!places) {
     console.error('Workers AI returned unusable output');
-    return json({ error: 'AI 回傳格式錯誤，請手動填寫' }, 502);
+    return { error: 'unusable' };
   }
-  if (places.length === 0) return json({ error: 'AI 在貼文裡找不到店家，請手動填寫' }, 422);
-  return json({ caption, places });
+  return { places };
 }
 
 // JSON mode returns an object, but some models return the JSON as a string.
