@@ -92,7 +92,8 @@
 3. ~~個人化（共用清單 + 個人紀錄）~~ → 2026-10-12 改為下方「權限模型 v2」
 
 ## 權限模型 v2（2026-10-12 使用者決策，取代「管理員審核」）
-- **一律可註冊**（Access 照舊 Include Everyone；拿掉 App 內 pending 審核，只保留網站管理員可停用帳號）
+> **2026-10-12 後續決策：只有自家人使用，取消自訂身分組（第 2 階段）。** 資安改在入口把關：兩個 Access 應用程式原則改為 **Include Emails（家人 email 白名單）**，不用 Everyone；Google OAuth 同意畫面保持「測試中」、只加家人為測試使用者。程式維持第 1 階段（個人清單 + 家人群組）當第二道防線。下方「一律可註冊」一項以此為準。
+- **一律可註冊**（程式層不再審核；實際入口由 Access email 白名單限制；網站管理員可停用帳號）
 - 每人自動有「個人清單」（只有自己看得到）；新註冊者預設只有個人清單，碰不到任何群組資料
 - **群組**：各自獨立的店家清單（如「家人」「同事」），一人可加入多群組，畫面可切換清單；現有店家搬進「家人」群組
 - **只有網站管理員（`ADMIN_EMAILS`）能建立群組**並指定擁有者；網站管理員可存取所有清單
@@ -106,13 +107,13 @@
      - 前端：主頁清單選單（記住上次選擇）＋「成員」連結；`public/members.html`；`public/admin.html` 改為群組建立＋帳號停用；`pending.html` 只剩停用提示
      - 升級：`migrations/0004_lists.sql` 建「家人」群組（**無擁有者**，需網站管理員在成員頁加自己並勾「設為擁有者」）
      - 驗證：`npm test` 23/23（新增 `test/d1.mjs` 以 node:sqlite 跑真實 schema；`test/lists.test.mjs` 6 項權限情境）；scratch 本機 D1 從最早 schema 依序跑 0002→0003→0004，舊資料與 status 進「家人」；本機 wrangler 三身分實測（家人加入前 404、管理員 Chrome 指定擁有者與加成員、主頁切換清單、家人加入後可讀寫家人清單但讀不到管理員個人清單、不能管理成員／建群組／用 /api/users）
-  2. 自訂身分組與權限檢查、成員／身分組管理畫面
-  3. 每人各自「吃過了」
+  2. ~~自訂身分組與權限檢查~~（已取消：只有自家人使用）
+  3. 每人各自「吃過了」（未定，等使用者需要再做）
   4. 之後：Google 地圖、LINE Bot（LINE 群組對應到美食地圖群組）
 4. Google 地圖：開 App 即為地圖、顯示已存店家標點與使用者目前位置；**使用者同意綁卡**使用 Google Maps Platform（Maps JS + Geocoding，需 Google Cloud 專案與帳單帳戶；Google 登入可用同一專案）
 5. LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）、AI 擷取可多店、處理 `unsend`（需記 LINE message id）
 
 ## 下一步
-1. 使用者（進行中）：Access 已建兩個應用程式且正式網址已被 Access 保護（2026-10-12 驗證 302 → blue-mouse-e3db.cloudflareaccess.com）、Google 登入已連線；待確認兩個應用程式原則為 Everyone、登入方法僅 One-time PIN + Google；設 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`；remote 依序跑 0002（若尚未）、0003、0004；`npm run deploy`；刪除舊部署
+1. 使用者（進行中）：Access 已建兩個應用程式且正式網址已被 Access 保護（2026-10-12 驗證 302 → blue-mouse-e3db.cloudflareaccess.com）、Google 登入已連線；待把兩個應用程式原則改為 Include Emails（家人白名單）、登入方法僅 One-time PIN + Google；Google OAuth 保持測試中並加家人為測試使用者；設 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`；remote 依序跑 0002（若尚未）、0003、0004；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
-3. 權限模型 v2 第 2 階段：自訂身分組與權限
+3. 路線圖：Google 地圖、LINE Bot
