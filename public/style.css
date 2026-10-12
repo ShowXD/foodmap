@@ -38,6 +38,13 @@ header {
 
 h1 { margin: 0 0 8px; font-size: 1.25rem; color: var(--accent); }
 
+.title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.user-bar { display: flex; gap: 10px; font-size: 0.85rem; color: var(--muted); min-width: 0; }
+.user-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-bar a, header > a { color: var(--accent); }
+.user-bar a[hidden] { display: none; }
+.user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+
 main { max-width: 640px; margin: 0 auto; padding: 16px; }
 
 input, textarea, button {

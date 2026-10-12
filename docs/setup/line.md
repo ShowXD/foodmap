@@ -61,7 +61,7 @@ LINE Developers Console → channel → **Messaging API** 分頁：
 
    如果你的 Pages 專案不叫 foodmap，網域就換成你自己的。
 2. 按 **Update**，再按 **Verify**，應該顯示 **Success**。
-   顯示 302 的話，代表這個路徑被登入擋住了，檢查 `functions/_middleware.js` 的 `PUBLIC_PATHS` 有沒有 `/api/line/webhook`；顯示 401 的話，通常是 `LINE_CHANNEL_SECRET` 沒設或貼錯。
+   顯示 302 的話，代表 Access 擋住了這個路徑，回頭檢查 [cloudflare.md 第 5-4 步](cloudflare.md#5-4-讓-line-webhook-路徑繞過-access)；顯示 401 的話，通常是 `LINE_CHANNEL_SECRET` 沒設或貼錯。
 3. **Use webhook** → 開啟。
 
 ## 5. 取得 Channel secret 並存進 Cloudflare

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#d9480f">
+  <meta name="robots" content="noindex">
+  <title>美食地圖・等待核准</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    :root { color-scheme: light dark; --bg: #fffaf5; --card: #fff; --text: #212529; --muted: #6c757d; --accent: #d9480f; --border: #e9ecef; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1a1a1a; --card: #262626; --text: #f1f3f5; --muted: #adb5bd; --accent: #ff8a50; --border: #3a3a3a; }
+    }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text); }
+    main { width: min(360px, calc(100vw - 32px)); display: grid; gap: 12px; padding: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+    h1 { margin: 0; font-size: 1.25rem; color: var(--accent); }
+    p { margin: 0; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>美食地圖</h1>
+    <p id="status-text">確認帳號狀態中…</p>
+    <p class="muted" id="email-text"></p>
+    <p><a href="/">重新整理</a> · <a href="/cdn-cgi/access/logout">換帳號登入</a></p>
+  </main>
+  <script>
+    fetch('/api/me').then((response) => response.json()).then(({ email, status }) => {
+      if (status === 'approved') return location.replace('/');
+      document.getElementById('status-text').textContent = status === 'disabled'
+        ? '這個帳號已被停用，有問題請聯絡管理員。'
+        : '已收到你的登入，請等管理員核准後再重新整理。';
+      document.getElementById('email-text').textContent = `登入帳號：${email}`;
+    }).catch(() => {
+      document.getElementById('status-text').textContent = '讀取帳號狀態失敗，請稍後重新整理。';
+    });
+  </script>
+</body>
+</html>

@@ -14,9 +14,14 @@ async function api(method, body, query = '', path = '/api/places') {
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
+  // 401: the Access session expired, so reloading sends the browser through the Access login.
   if (response.status === 401) {
-    location.href = '/login';
+    location.reload();
     throw new Error('請重新登入');
+  }
+  if (response.status === 403 && path !== '/api/users') {
+    location.href = '/pending';
+    throw new Error('帳號尚未核准');
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), { status: response.status });
@@ -233,6 +238,13 @@ function prefillFromShare() {
 }
 
 prefillFromShare();
+
+api('GET', null, '', '/api/me')
+  .then((me) => {
+    document.getElementById('user-email').textContent = me.email;
+    document.getElementById('admin-link').hidden = !me.isAdmin;
+  })
+  .catch((error) => console.error('Failed to load current user', error));
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch((error) => console.error('Service worker registration failed', error));

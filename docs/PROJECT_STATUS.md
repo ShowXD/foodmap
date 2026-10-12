@@ -2,7 +2,7 @@
 
 ## 目標
 收藏 LINE 群組裡的 IG/FB 美食影片連結，家人共用、可搜尋、一鍵開 Google Maps。
-架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1 + Workers AI，登入用自建「家庭密碼」（`functions/_middleware.js`）。
+架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1 + Workers AI，登入用 Cloudflare Access（Email 驗證碼、Google）+ App 內管理員審核（`functions/_middleware.js`）。
 
 ## 目前分支
 - `main`：已 fast-forward 合併階段 1、2、編輯功能、階段 3 與設定文件，未 push
@@ -40,20 +40,23 @@
 
 ## 資安約束（repo 預計公開）
 - 任何金鑰（LINE channel secret 等）只放 Cloudflare secret 或本機 `.dev.vars`，不進 repo（`.gitignore` 已排除 `.dev.vars*`、`.env*`、`.wrangler/`）
-- 登入（2026-10-12 決策：Cloudflare Zero Trust 免費方案要求綁卡，使用者選擇不綁，改自建家庭密碼）：
-  - `functions/_middleware.js` 擋所有路徑（含預覽網址），只放行 `/login`、`/login.html`、`/api/login`、`/api/line/webhook`、`/icon.svg`；未登入網頁 302 → `/login`，API 401
-  - `functions/api/login.js`：表單 POST 比對 `FAMILY_PASSWORD`（SHA-256 後定時比較），成功發 `foodmap_session` cookie（`<到期ms>.<HMAC>`，30 天，HttpOnly/Secure/SameSite=Lax）；HMAC key = `SESSION_SECRET` + `FAMILY_PASSWORD`，換密碼即全部登出；失敗固定延遲 1 秒
-  - 任一 secret 未設 → 全站 503（fail closed）
-  - `/api/line/webhook` 不經登入，安全性靠 LINE 簽章
+- 登入（2026-10-12 最終決策：使用者改為願意綁卡 → 用 Cloudflare Access，登入方式 Email 驗證碼 + Google；App 內管理員審核；取代曾短暫上線的家庭密碼）：
+  - Access 政策 Include Everyone（任何登入者），真正授權在 App：`users` 表 status pending/approved/disabled + is_admin
+  - `lib/access.js`：用 WebCrypto 驗 `Cf-Access-Jwt-Assertion`（RS256、iss=team 網域、aud ∈ `ACCESS_AUD`、exp/nbf、需有 email），certs 快取 1 小時、未知 kid 重抓一次；未引入 jose 依賴
+  - `lib/users.js`：首次登入建 pending；`ADMIN_EMAILS` 內的 email 自動成為已核准管理員（不用「第一個登入者當管理員」，避免陌生人搶先）
+  - `functions/_middleware.js`：只放行 `/api/line/webhook`；缺 `ACCESS_TEAM_DOMAIN`/`ACCESS_AUD` → 503（fail closed）；JWT 無效 → 401；非 approved → 網頁 302 `/pending`、API 403（只放行 `/pending`、`/api/me`、`/icon.svg`）；`DEV_USER_EMAIL` 只在 localhost 生效
+  - `functions/api/me.js`（目前登入者）、`functions/api/users.js`（管理員限定 GET/PATCH，禁止停用或降級自己）；`public/pending.html`、`public/admin.html`；主頁右上顯示 email、管理、登出（`/cdn-cgi/access/logout`）
+  - 部署需設 secret：`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`（正式,預覽 兩個 AUD）、`ADMIN_EMAILS`；可刪除舊的 `FAMILY_PASSWORD`、`SESSION_SECRET`
+  - `/api/line/webhook` 需在 Access 另建 Bypass app（pages.dev 上可行性未實測），安全性靠 LINE 簽章
 - 測試資料只用虛構內容，不放家人真實資料或 email
 
 ## 待決事項
 - 使用者需自備：Cloudflare 帳號、LINE Messaging API channel、家人 email 白名單
 - 申請與部署步驟見 `docs/setup/`（`cloudflare.md` → `line.md`）；LINE 只需 Channel secret（secret 名稱 `LINE_CHANNEL_SECRET`），不需 access token
 - 已部署：Pages 專案名 `foodmap-edl`（`foodmap` 已被占用），正式網址 `https://foodmap-edl.pages.dev`；D1 已建立並套用 schema（使用者 2026-10-12 操作）
-- 登入已上線（2026-10-12 驗證）：使用者已設 `FAMILY_PASSWORD`、`SESSION_SECRET` 並重新部署；正式網址與新部署網址未登入時 `/` 302 → `/login`、`/api/places` 401
+- 線上目前跑的是家庭密碼版（2026-10-12 已驗證未登入 302/401）；Access 版合併後需使用者依 `docs/setup/cloudflare.md` 第 5 步設定 Access 與 secret、跑 `migrations/0003_users.sql` 再部署，並刪除家庭密碼版的舊部署
 - 資安事件（已處理）：無登入的舊部署 `b313a776.foodmap-edl.pages.dev` 仍可免登入讀寫正式 D1（Pages 永久保留每次部署）；使用者已刪除，驗證回 404；當時 DB 無資料。規則：資安修正部署後必須刪除修正前的舊部署（寫在 `docs/setup/cloudflare.md`）
-- 本機 `npm run dev` 需帳號已註冊 workers.dev 子網域（AI 遠端綁定要求），使用者尚未註冊；`wrangler.toml` 的 `database_id` 使用者已在本機填入，尚未決定是否 commit（目前未 commit）
+- 本機 `npm run dev` 需帳號已註冊 workers.dev 子網域（AI 遠端綁定要求），使用者尚未註冊；`database_id` 已依使用者同意 commit（0314e73）
 
 ## 階段 2 驗證（2026-10-08）
 - 本機 `wrangler pages dev` + Chrome：`/?text=這家好好吃 <IG連結>&url=<IG連結>` → 表單自動展開、連結與貼文文字正確帶入、網址列清掉 query；存檔後 DB `source=share`，表單 `source` 回到 `manual`；console 無錯誤
@@ -83,11 +86,14 @@
 
 ## 已核准的路線圖（2026-10-12，依序，每項一個分支）
 1. ✅ 多店（本節上方）
-2. 個人帳號：三種登入方式都要——LINE Login、Google 登入、自建帳號密碼；**管理員審核制**（首次登入為待審核，管理員在 App 內核准／停用）；取代家庭密碼
-3. 個人化：共用清單 + 記錄誰新增 +「吃過了」改為每人各自標記
+2. ✅ 個人帳號（改用 Cloudflare Access + App 內審核，見「資安約束」；原本規劃的 LINE Login / 自建帳密已取消）
+   - 驗證（2026-10-12）：`npm test` 16/16（`test/access.test.mjs`：JWT 正確／錯 aud／錯 iss／過期／nbf／缺 email／竄改／alg none／未知 kid／金鑰輪替重抓；ensureUser；middleware fail-closed、DEV_USER_EMAIL 非 localhost 無效、pending 導向）；scratch 本機 wrangler（無 AI 綁定）以 `DEV_USER_EMAIL` 模擬：pending 家人網頁 302 `/pending`、API 403、`/api/me` 200；管理員在 `/admin` 核准（Chrome）後家人可用 `/api/places`、`/api/users` 仍 403；管理員停用／降級自己被擋
+   - 未驗證：真實 Access JWT（需使用者設定 Access 後部署）
+3. 個人化：共用清單 + 記錄誰新增 +「吃過了」改為每人各自標記（`data.user.id` 已可在 API 取得）
 4. Google 地圖：開 App 即為地圖、顯示已存店家標點與使用者目前位置；**使用者同意綁卡**使用 Google Maps Platform（Maps JS + Geocoding，需 Google Cloud 專案與帳單帳戶；Google 登入可用同一專案）
 5. LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）、AI 擷取可多店、處理 `unsend`（需記 LINE message id）
 
 ## 下一步
-1. 使用者：對 remote 執行 `migrations/0002_multi_place.sql` 後再 `npm run deploy`
-2. 路線圖第 2 項個人帳號（需先確認：Workers 免費方案每請求 CPU 10ms，自建密碼的 PBKDF2 雜湊可能超時，要實測或調整做法）
+1. 使用者：對 remote 依序執行 `migrations/0002_multi_place.sql`（若尚未）、`migrations/0003_users.sql`；照 `docs/setup/cloudflare.md` 第 5 步設定 Access、Google 登入與 secret；`npm run deploy`；刪除舊部署
+2. 部署後驗證：正式網址未登入導向 cloudflareaccess.com、管理員登入可進管理頁、家人登入為待核准
+3. 路線圖第 3 項個人化

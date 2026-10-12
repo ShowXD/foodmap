@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#d9480f">
+  <meta name="robots" content="noindex">
+  <title>美食地圖・管理成員</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>管理成員</h1>
+    <a href="/">← 回美食地圖</a>
+  </header>
+  <main>
+    <p id="admin-message" role="status">載入中…</p>
+    <ul id="user-list" class="user-list"></ul>
+  </main>
+  <script type="module">
+    const message = document.getElementById('admin-message');
+    const list = document.getElementById('user-list');
+    const STATUS_LABELS = { pending: '待核准', approved: '已核准', disabled: '已停用' };
+
+    async function api(method, body) {
+      const response = await fetch('/api/users', {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      return payload;
+    }
+
+    function actionButton(label, changes, user, className = 'secondary') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = className;
+      button.textContent = label;
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          await api('PATCH', { id: user.id, ...changes });
+          await load();
+        } catch (error) {
+          message.textContent = `更新失敗：${error.message}`;
+          button.disabled = false;
+        }
+      });
+      return button;
+    }
+
+    function renderUser(user, me) {
+      const item = document.createElement('li');
+      item.className = 'place';
+      const title = document.createElement('h2');
+      title.textContent = user.email + (user.email === me.email ? '（你）' : '');
+      const meta = document.createElement('p');
+      meta.className = 'meta';
+      meta.textContent = `${STATUS_LABELS[user.status]}${user.is_admin ? ' · 管理員' : ''} · 首次登入 ${user.created_at} (UTC)`;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      if (user.email !== me.email) {
+        if (user.status !== 'approved') actions.append(actionButton('核准', { status: 'approved' }, user, ''));
+        if (user.status !== 'disabled') actions.append(actionButton('停用', { status: 'disabled' }, user));
+        if (user.status === 'approved') {
+          actions.append(actionButton(user.is_admin ? '取消管理員' : '設為管理員', { is_admin: !user.is_admin }, user));
+        }
+      }
+      item.append(title, meta, actions);
+      return item;
+    }
+
+    async function load() {
+      const me = await fetch('/api/me').then((response) => response.json());
+      if (!me.isAdmin) {
+        message.textContent = '只有管理員可以使用這個頁面。';
+        return;
+      }
+      const users = await api('GET');
+      const pendingCount = users.filter((user) => user.status === 'pending').length;
+      message.textContent = pendingCount ? `有 ${pendingCount} 位等待核准` : '目前沒有待核准的成員';
+      list.replaceChildren(...users.map((user) => renderUser(user, me)));
+    }
+
+    load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
+  </script>
+</body>
+</html>

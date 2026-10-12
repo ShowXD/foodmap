@@ -11,7 +11,14 @@
 </head>
 <body>
   <header>
-    <h1>美食地圖</h1>
+    <div class="title-row">
+      <h1>美食地圖</h1>
+      <nav class="user-bar">
+        <span id="user-email"></span>
+        <a id="admin-link" href="/admin" hidden>管理</a>
+        <a href="/cdn-cgi/access/logout">登出</a>
+      </nav>
+    </div>
     <input id="search" type="search" placeholder="搜尋店名、食物、地區、標籤…" aria-label="搜尋">
   </header>
 
