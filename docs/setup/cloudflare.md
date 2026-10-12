@@ -1,6 +1,6 @@
 # Cloudflare 設定步驟
 
-美食地圖的網頁、API 和資料庫都放在 Cloudflare。登入用 Cloudflare Access（email 驗證碼或 Google），每個人用自己的帳號，由管理員在 App 內核准。
+美食地圖的網頁、API 和資料庫都放在 Cloudflare。登入用 Cloudflare Access（email 驗證碼或 Google），任何人都能註冊。每個人有自己的清單，共用的清單用群組管理。
 兩份設定文件請依這個順序做：**Cloudflare（本文件）→ [LINE](line.md)**。LINE 需要用到這裡部署出來的網址。
 「AI 自動填入」用的是 Cloudflare Workers AI 的免費額度，不需要另外申請 AI 帳號或金鑰。
 
@@ -80,15 +80,19 @@ npm run deploy
 - 免費方案超過額度時只會失敗、不會扣款，App 會顯示「AI 暫時無法使用」，手動填寫照常能用。
 - 用量可以在控制台的 **AI** → **Workers AI** 查看。
 
-## 5. 用 Cloudflare Access 登入，並在 App 內審核成員
+## 5. 用 Cloudflare Access 登入，並用群組區分權限
 
 **怎麼運作**
 - 登入由 Cloudflare Access 負責。家人可以用 email 收驗證碼，或直接用 Google 帳號登入。
 - 程式會驗證 Access 簽發的憑證（JWT），從中取得登入者的 email。
-- 第一次登入的人是「待核准」狀態，只能看到等待頁面。
-- 管理員在 App 的「管理」頁按下核准後，對方才能使用。管理員也可以隨時停用任何成員。
+- **任何人都可以註冊。** 第一次登入會自動拿到一個「我的清單」，只有自己看得到。
+- 要共用的清單就建成**群組**（例如「家人」）：
+  - 只有網站管理員能建群組。
+  - 群組擁有者在「成員」頁用 email 把人加進來。
+  - 不是群組成員的人，看不到群組裡的任何資料。
+- 網站管理員可以在「管理」頁停用任何帳號。
 
-> Access 免費方案最多 50 位使用者，但需要先綁定付款方式。Access 的規則設成「任何登入的人都放行」，真正的把關交給 App 內的審核。
+> Access 免費方案最多 50 位使用者，但需要先綁定付款方式。Access 的規則設成「任何登入的人都放行」，誰能看到哪份清單由 App 的群組決定。
 
 ### 5-1 查出你的 team 網域
 
@@ -120,7 +124,7 @@ npm run deploy
 最後會有兩個 Access 應用程式。兩個的 **Policies** 都設成：
 
 - Action：**Allow**
-- Include：**Everyone**（任何成功登入的人；審核交給 App）
+- Include：**Everyone**（任何成功登入的人；能看什麼由 App 的群組決定）
 - 登入方式（Login methods）勾選 One-time PIN 和 Google
 
 再到兩個應用程式的 **Additional settings**，各抄下 **Application Audience (AUD) Tag**。
@@ -145,7 +149,7 @@ npm run deploy
 ```
 
 - 這些值會在下次部署後生效。
-- `ADMIN_EMAILS` 裡的人第一次登入就自動是「已核准的管理員」，其他人一律從「待核准」開始。
+- `ADMIN_EMAILS` 裡的人第一次登入就自動是網站管理員，可以建立群組、停用帳號。其他人只會有自己的「我的清單」。
 - 任何一個值沒設好時，網站會一律回 503，不會變成公開。
 
 ### 舊的家庭密碼可以刪掉
@@ -185,17 +189,25 @@ curl -si -X POST https://<專案>.pages.dev/api/line/webhook | head -5
 ```
 
 接著照這個順序實測：
-1. 用手機開網址，用 email 驗證碼或 Google 登入。如果你的 email 在 `ADMIN_EMAILS` 裡，會直接進到美食地圖，右上角有「管理」。
-2. 請一位家人登入，對方會看到「等待管理員核准」。
-3. 你到「管理」頁按核准，對方重新整理後就能使用。
-4. 最後把網頁「加到主畫面」安裝成 App。
+1. 用手機開網址，用 email 驗證碼或 Google 登入。如果你的 email 在 `ADMIN_EMAILS` 裡，右上角會有「管理」。
+2. 到「管理」頁：
+   - 如果有跑過 `0004_lists.sql`，會看到升級時建立的「家人」群組，舊的店家都在裡面，但**這個群組還沒有擁有者**。點「管理成員」，輸入你的 email、勾「設為擁有者」再按加入。
+   - 全新安裝的話，直接在「群組」區塊建立「家人」。擁有者 email 留空，就是你自己。
+3. 請家人登入一次，讓他們的帳號被建立。然後在主頁切到「家人」，點「成員」，輸入他們的 email 加入。
+4. 家人重新整理後，就能在清單選單切換到「家人」。
+5. 最後把網頁「加到主畫面」安裝成 App。
 
 ### 登入怎麼運作（給之後維護的人）
 
 - `functions/_middleware.js` 會用 `lib/access.js` 驗證 `Cf-Access-Jwt-Assertion`：RS256 簽章、`iss` 是 team 網域、`aud` 在 `ACCESS_AUD` 裡、而且沒過期。公鑰從 `<team>/cdn-cgi/access/certs` 取得，快取 1 小時；遇到沒看過的 kid 會重抓一次。
-- 驗證通過後，用 `lib/users.js` 建立或讀取 `users` 紀錄。非「已核准」的人，網頁會被導到 `/pending`，API 回 403；只放行 `/pending`、`/api/me`、`/icon.svg`。
+- 驗證通過後，用 `lib/users.js` 建立或讀取 `users` 紀錄。被停用的帳號，網頁會被導到 `/pending`，API 回 403；只放行 `/pending`、`/api/me`、`/icon.svg`。
+- 清單權限在 `lib/lists.js`：
+  - 個人清單只有本人能用，**網站管理員也看不到**。
+  - 群組清單限群組成員，網站管理員則可以看所有群組。
+  - 沒有權限時一律回 404，不透露那個 ID 存不存在。
 - 只有 `/api/line/webhook` 完全不經過登入。
-- 管理 API `/api/users` 只限管理員使用，而且禁止停用或降級自己，避免沒有任何管理員。
+- 管理 API `/api/users` 只限網站管理員使用，而且禁止停用或降級自己，避免沒有任何管理員。
+- 群組擁有者只能由網站管理員指定或移除。
 
 ---
 
@@ -216,7 +228,8 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | 檔案 | 內容 | 誰需要跑 |
 |---|---|---|
 | `0002_multi_place.sql` | 一則影片可以存多家店（拿掉網址不可重複的限制，資料保留） | 2026-10-12 以前用 `schema.sql` 建的資料庫 |
-| `0003_users.sql` | 新增 `users` 表（個人帳號與審核） | 還沒有 `users` 表的資料庫 |
+| `0003_users.sql` | 新增 `users` 表（個人帳號） | 還沒有 `users` 表的資料庫 |
+| `0004_lists.sql` | 個人清單與群組清單；舊店家搬進「家人」群組；取消審核 | 跑過 0003、還沒有 `lists` 表的資料庫 |
 
 全新建立的資料庫只要跑 `schema.sql`，它已經是最新結構，不用再跑 `migrations/`。
 

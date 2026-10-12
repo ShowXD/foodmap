@@ -89,11 +89,30 @@
 2. ✅ 個人帳號（改用 Cloudflare Access + App 內審核，見「資安約束」；原本規劃的 LINE Login / 自建帳密已取消）
    - 驗證（2026-10-12）：`npm test` 16/16（`test/access.test.mjs`：JWT 正確／錯 aud／錯 iss／過期／nbf／缺 email／竄改／alg none／未知 kid／金鑰輪替重抓；ensureUser；middleware fail-closed、DEV_USER_EMAIL 非 localhost 無效、pending 導向）；scratch 本機 wrangler（無 AI 綁定）以 `DEV_USER_EMAIL` 模擬：pending 家人網頁 302 `/pending`、API 403、`/api/me` 200；管理員在 `/admin` 核准（Chrome）後家人可用 `/api/places`、`/api/users` 仍 403；管理員停用／降級自己被擋
    - 未驗證：真實 Access JWT（需使用者設定 Access 後部署）
-3. 個人化：共用清單 + 記錄誰新增 +「吃過了」改為每人各自標記（`data.user.id` 已可在 API 取得）
+3. ~~個人化（共用清單 + 個人紀錄）~~ → 2026-10-12 改為下方「權限模型 v2」
+
+## 權限模型 v2（2026-10-12 使用者決策，取代「管理員審核」）
+- **一律可註冊**（Access 照舊 Include Everyone；拿掉 App 內 pending 審核，只保留網站管理員可停用帳號）
+- 每人自動有「個人清單」（只有自己看得到）；新註冊者預設只有個人清單，碰不到任何群組資料
+- **群組**：各自獨立的店家清單（如「家人」「同事」），一人可加入多群組，畫面可切換清單；現有店家搬進「家人」群組
+- **只有網站管理員（`ADMIN_EMAILS`）能建立群組**並指定擁有者；網站管理員可存取所有清單
+- **加入群組用 email**（對方需已登入過一次），由有「管理成員」權限者操作
+- **自訂身分組（類 Discord，每個群組各自定義）**，可勾選權限：看清單、新增店家、編輯自己新增的、編輯所有人的、刪除、管理成員、管理身分組；群組擁有者永遠全權限
+- 併入：記錄 `created_by`、「吃過了」改每人各自標記
+- 分階段：
+  1. ✅ 清單架構（2026-10-12 實作並本機驗證）：`lists`／`list_members`、`places.list_id`/`created_by`、個人清單自動建立、清單切換、管理員建群組與 email 加成員、搬移現有資料、拿掉審核（此階段群組成員權限一律全開）
+     - 程式：`lib/lists.js`（`findAccessibleList`、`findManageableGroup`、`accessibleLists`、`ensurePersonalList`）；`functions/api/lists.js`（GET 清單、POST 建群組限網站管理員）；`functions/api/list-members.js`（GET 成員、POST 以 email 加入、DELETE 移除；擁有者只能由網站管理員指定或移除）；`places.js` 所有操作限可存取清單、POST 記 `created_by`、重複判定改為同清單內；無權限一律 404
+     - 個人清單網站管理員也看不到；網站管理員可存取所有群組
+     - 前端：主頁清單選單（記住上次選擇）＋「成員」連結；`public/members.html`；`public/admin.html` 改為群組建立＋帳號停用；`pending.html` 只剩停用提示
+     - 升級：`migrations/0004_lists.sql` 建「家人」群組（**無擁有者**，需網站管理員在成員頁加自己並勾「設為擁有者」）
+     - 驗證：`npm test` 23/23（新增 `test/d1.mjs` 以 node:sqlite 跑真實 schema；`test/lists.test.mjs` 6 項權限情境）；scratch 本機 D1 從最早 schema 依序跑 0002→0003→0004，舊資料與 status 進「家人」；本機 wrangler 三身分實測（家人加入前 404、管理員 Chrome 指定擁有者與加成員、主頁切換清單、家人加入後可讀寫家人清單但讀不到管理員個人清單、不能管理成員／建群組／用 /api/users）
+  2. 自訂身分組與權限檢查、成員／身分組管理畫面
+  3. 每人各自「吃過了」
+  4. 之後：Google 地圖、LINE Bot（LINE 群組對應到美食地圖群組）
 4. Google 地圖：開 App 即為地圖、顯示已存店家標點與使用者目前位置；**使用者同意綁卡**使用 Google Maps Platform（Maps JS + Geocoding，需 Google Cloud 專案與帳單帳戶；Google 登入可用同一專案）
 5. LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）、AI 擷取可多店、處理 `unsend`（需記 LINE message id）
 
 ## 下一步
-1. 使用者：對 remote 依序執行 `migrations/0002_multi_place.sql`（若尚未）、`migrations/0003_users.sql`；照 `docs/setup/cloudflare.md` 第 5 步設定 Access、Google 登入與 secret；`npm run deploy`；刪除舊部署
-2. 部署後驗證：正式網址未登入導向 cloudflareaccess.com、管理員登入可進管理頁、家人登入為待核准
-3. 路線圖第 3 項個人化
+1. 使用者（進行中）：Access 已建兩個應用程式且正式網址已被 Access 保護（2026-10-12 驗證 302 → blue-mouse-e3db.cloudflareaccess.com）、Google 登入已連線；待確認兩個應用程式原則為 Everyone、登入方法僅 One-time PIN + Google；設 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`；remote 依序跑 0002（若尚未）、0003、0004；`npm run deploy`；刪除舊部署
+2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
+3. 權限模型 v2 第 2 階段：自訂身分組與權限

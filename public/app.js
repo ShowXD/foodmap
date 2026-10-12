@@ -4,6 +4,7 @@ const listMessage = document.getElementById('list-message');
 const addForm = document.getElementById('add-form');
 const formMessage = document.getElementById('form-message');
 const placeTemplate = document.getElementById('place-template');
+let currentListId = null;
 
 const mapsUrl = (place) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '))}`;
@@ -19,11 +20,11 @@ async function api(method, body, query = '', path = '/api/places') {
     location.reload();
     throw new Error('請重新登入');
   }
-  if (response.status === 403 && path !== '/api/users') {
-    location.href = '/pending';
-    throw new Error('帳號尚未核准');
-  }
   const payload = await response.json().catch(() => ({}));
+  if (response.status === 403 && payload.error === 'account disabled') {
+    location.href = '/pending';
+    throw new Error('帳號已停用');
+  }
   if (!response.ok) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), { status: response.status });
   return payload;
 }
@@ -134,7 +135,7 @@ saveCandidatesButton.addEventListener('click', async () => {
   const counts = { saved: 0, duplicate: 0, failed: 0 };
   for (const place of chosen) {
     try {
-      await api('POST', { ...place, url: url.value, caption: caption.value, source: source.value, note: note.value });
+      await api('POST', { ...place, list_id: currentListId, url: url.value, caption: caption.value, source: source.value, note: note.value });
       counts.saved++;
     } catch (error) {
       if (error.status === 409) counts.duplicate++;
@@ -190,7 +191,7 @@ async function loadPlaces() {
   const query = searchInput.value.trim();
   listMessage.textContent = '載入中…';
   try {
-    const places = await api('GET', null, query ? `?q=${encodeURIComponent(query)}` : '');
+    const places = await api('GET', null, `?list=${currentListId}${query ? `&q=${encodeURIComponent(query)}` : ''}`);
     placeList.replaceChildren(...places.map(renderPlace));
     listMessage.textContent = places.length ? '' : (query ? '找不到符合的店' : '還沒有收藏，先新增一家吧');
   } catch (error) {
@@ -213,7 +214,7 @@ addForm.addEventListener('submit', async (event) => {
   const editingId = Number(formFields.id);
   try {
     if (editingId) await api('PATCH', { ...formFields, id: editingId });
-    else await api('POST', formFields);
+    else await api('POST', { ...formFields, list_id: currentListId });
     resetForm();
     formMessage.textContent = editingId ? '已更新' : '已儲存';
     loadPlaces();
@@ -250,4 +251,47 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch((error) => console.error('Service worker registration failed', error));
 }
 
-loadPlaces();
+const listSelect = document.getElementById('list-select');
+const membersLink = document.getElementById('members-link');
+const LIST_STORAGE_KEY = 'foodmap.list';
+let lists = [];
+
+// Remembering the last list is a convenience; storage can be blocked (private mode), so failures just fall back.
+function readSavedListId() {
+  try {
+    return Number(localStorage.getItem(LIST_STORAGE_KEY));
+  } catch {
+    return 0;
+  }
+}
+
+function selectList(listId) {
+  const list = lists.find((candidate) => candidate.id === listId) ?? lists[0];
+  currentListId = list.id;
+  listSelect.value = String(list.id);
+  membersLink.hidden = Boolean(list.is_personal);
+  membersLink.href = `/members?list=${list.id}`;
+  try {
+    localStorage.setItem(LIST_STORAGE_KEY, String(list.id));
+  } catch {
+    // Not remembering the choice is fine.
+  }
+}
+
+async function loadLists() {
+  lists = await api('GET', null, '', '/api/lists');
+  listSelect.replaceChildren(...lists.map((list) => new Option(`${list.is_personal ? '👤' : '👥'} ${list.name}`, list.id)));
+  selectList(readSavedListId());
+}
+
+listSelect.addEventListener('change', () => {
+  selectList(Number(listSelect.value));
+  resetForm();
+  loadPlaces();
+});
+
+loadLists()
+  .then(loadPlaces)
+  .catch((error) => {
+    listMessage.textContent = `載入清單失敗：${error.message}`;
+  });

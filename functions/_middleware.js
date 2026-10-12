@@ -3,7 +3,7 @@ import { ensureUser } from '../lib/users.js';
 
 // The LINE webhook can't log in; it authenticates with the x-line-signature header instead.
 const PUBLIC_PATHS = new Set(['/api/line/webhook']);
-// Pending or disabled users can only see the waiting page and their own status.
+// Disabled users can only see the notice page and their own status.
 const WAITING_PATHS = new Set(['/pending', '/pending.html', '/api/me', '/icon.svg']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 
@@ -37,8 +37,8 @@ export async function onRequest(context) {
 
   const user = await ensureUser(env.DB, email, env);
   data.user = user;
-  if (user.status === 'approved' || WAITING_PATHS.has(pathname)) return next();
+  if (user.status !== 'disabled' || WAITING_PATHS.has(pathname)) return next();
 
-  if (pathname.startsWith('/api/')) return Response.json({ error: 'not approved', status: user.status }, { status: 403 });
+  if (pathname.startsWith('/api/')) return Response.json({ error: 'account disabled', status: user.status }, { status: 403 });
   return Response.redirect(new URL('/pending', request.url), 302);
 }

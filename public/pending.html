@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#d9480f">
   <meta name="robots" content="noindex">
-  <title>美食地圖・等待核准</title>
+  <title>美食地圖・帳號已停用</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <style>
     :root { color-scheme: light dark; --bg: #fffaf5; --card: #fff; --text: #212529; --muted: #6c757d; --accent: #d9480f; --border: #e9ecef; }
@@ -29,10 +29,8 @@
   </main>
   <script>
     fetch('/api/me').then((response) => response.json()).then(({ email, status }) => {
-      if (status === 'approved') return location.replace('/');
-      document.getElementById('status-text').textContent = status === 'disabled'
-        ? '這個帳號已被停用，有問題請聯絡管理員。'
-        : '已收到你的登入，請等管理員核准後再重新整理。';
+      if (status !== 'disabled') return location.replace('/');
+      document.getElementById('status-text').textContent = '這個帳號已被停用，有問題請聯絡網站管理員。';
       document.getElementById('email-text').textContent = `登入帳號：${email}`;
     }).catch(() => {
       document.getElementById('status-text').textContent = '讀取帳號狀態失敗，請稍後重新整理。';

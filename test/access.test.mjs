@@ -3,6 +3,7 @@ import test from 'node:test';
 import { verifyAccessJwt, resetJwksCacheForTests } from '../lib/access.js';
 import { ensureUser } from '../lib/users.js';
 import { onRequest } from '../functions/_middleware.js';
+import { createTestDb } from './d1.mjs';
 
 const TEAM = 'https://family.cloudflareaccess.com';
 const AUD = 'aud-production';
@@ -68,42 +69,24 @@ test('refetches certs once when the signing key rotated', async () => {
   assert.equal(calls, 2);
 });
 
-function fakeDb(users = []) {
-  return {
-    users,
-    prepare(sql) {
-      return {
-        bind(...args) {
-          return {
-            async first() {
-              if (sql.startsWith('SELECT * FROM users WHERE email')) return users.find((user) => user.email === args[0]) ?? null;
-              if (sql.startsWith('INSERT INTO users')) {
-                const user = { id: users.length + 1, email: args[0], status: args[1], is_admin: args[2] };
-                users.push(user);
-                return user;
-              }
-              if (sql.startsWith('UPDATE users')) {
-                const user = users.find((candidate) => candidate.id === args[0]);
-                Object.assign(user, { status: 'approved', is_admin: 1 });
-                return user;
-              }
-              throw new Error(`unexpected SQL: ${sql}`);
-            },
-          };
-        },
-      };
-    },
-  };
+function dbWithUsers(rows = []) {
+  const db = createTestDb();
+  for (const { email, status, is_admin: isAdmin } of rows) {
+    db.sqlite.prepare('INSERT INTO users (email, status, is_admin) VALUES (?, ?, ?)').run(email, status, isAdmin);
+  }
+  return db;
 }
 
-test('ensureUser creates pending users and bootstraps admins from ADMIN_EMAILS', async () => {
-  const db = fakeDb();
+test('ensureUser opens registration and bootstraps admins from ADMIN_EMAILS', async () => {
+  const db = dbWithUsers();
   const env = { ADMIN_EMAILS: ' Me@Example.com , ' };
-  assert.equal((await ensureUser(db, 'kid@example.com', env)).status, 'pending');
+  const kid = await ensureUser(db, 'kid@example.com', env);
+  assert.deepEqual([kid.status, kid.is_admin], ['approved', 0]);
   const admin = await ensureUser(db, 'me@example.com', env);
   assert.deepEqual([admin.status, admin.is_admin], ['approved', 1]);
+  assert.equal((await ensureUser(db, 'kid@example.com', env)).id, kid.id);
 
-  db.users.push({ id: 9, email: 'late@example.com', status: 'pending', is_admin: 0 });
+  db.sqlite.prepare("INSERT INTO users (email, status, is_admin) VALUES ('late@example.com', 'disabled', 0)").run();
   const promoted = await ensureUser(db, 'late@example.com', { ADMIN_EMAILS: 'late@example.com' });
   assert.deepEqual([promoted.status, promoted.is_admin], ['approved', 1]);
 });
@@ -115,7 +98,7 @@ function runMiddleware(url, env, headers = {}) {
 }
 
 test('middleware fails closed and never trusts DEV_USER_EMAIL outside localhost', async () => {
-  const db = fakeDb([{ id: 1, email: 'me@example.com', status: 'approved', is_admin: 1 }]);
+  const db = dbWithUsers([{ email: 'me@example.com', status: 'approved', is_admin: 1 }]);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/api/line/webhook', {})).response, NEXT);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', { DB: db })).response.status, 503);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', { DB: db, DEV_USER_EMAIL: 'me@example.com' })).response.status, 503);
@@ -125,10 +108,10 @@ test('middleware fails closed and never trusts DEV_USER_EMAIL outside localhost'
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', configured, { 'Cf-Access-Jwt-Assertion': 'forged' })).response.status, 401);
 });
 
-test('middleware lets approved users through and parks everyone else on /pending', async () => {
-  const db = fakeDb([
-    { id: 1, email: 'me@example.com', status: 'approved', is_admin: 1 },
-    { id: 2, email: 'kid@example.com', status: 'pending', is_admin: 0 },
+test('middleware lets every signed-in user through and parks only disabled accounts on /pending', async () => {
+  const db = dbWithUsers([
+    { email: 'me@example.com', status: 'approved', is_admin: 1 },
+    { email: 'banned@example.com', status: 'disabled', is_admin: 0 },
   ]);
   const asUser = (email) => ({ DB: db, DEV_USER_EMAIL: email });
 
@@ -136,13 +119,13 @@ test('middleware lets approved users through and parks everyone else on /pending
   assert.equal(approved.response, NEXT);
   assert.equal(approved.user.email, 'me@example.com');
 
-  assert.equal((await runMiddleware('http://localhost:8788/api/places', asUser('kid@example.com'))).response.status, 403);
-  const page = (await runMiddleware('http://localhost:8788/', asUser('kid@example.com'))).response;
+  const stranger = await runMiddleware('http://localhost:8788/', asUser('stranger@example.com'));
+  assert.equal(stranger.response, NEXT);
+  assert.equal(stranger.user.status, 'approved');
+
+  assert.equal((await runMiddleware('http://localhost:8788/api/places', asUser('banned@example.com'))).response.status, 403);
+  const page = (await runMiddleware('http://localhost:8788/', asUser('banned@example.com'))).response;
   assert.equal(page.status, 302);
   assert.equal(new URL(page.headers.get('Location')).pathname, '/pending');
-  assert.equal((await runMiddleware('http://localhost:8788/api/me', asUser('kid@example.com'))).response, NEXT);
-
-  const stranger = await runMiddleware('http://localhost:8788/', asUser('stranger@example.com'));
-  assert.equal(stranger.response.status, 302);
-  assert.equal(stranger.user.status, 'pending');
+  assert.equal((await runMiddleware('http://localhost:8788/api/me', asUser('banned@example.com'))).response, NEXT);
 });
