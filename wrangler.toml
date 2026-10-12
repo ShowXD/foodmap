@@ -9,4 +9,4 @@ binding = "AI"
 binding = "DB"
 database_name = "foodmap"
 # Fill in after `npx wrangler d1 create foodmap`
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "653b2f0d-2d58-4215-972b-6cb09c4074b1"
