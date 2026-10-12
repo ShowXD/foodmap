@@ -2,7 +2,7 @@
 
 ## 目標
 收藏 LINE 群組裡的 IG/FB 美食影片連結，家人共用、可搜尋、一鍵開 Google Maps。
-架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1，登入用 Cloudflare Access。
+架構：純 HTML/JS PWA + Cloudflare Pages Functions + D1 + Workers AI，登入用自建「家庭密碼」（`functions/_middleware.js`）。
 
 ## 目前分支
 - `main`：已 fast-forward 合併階段 1、2、編輯功能、階段 3 與設定文件，未 push
@@ -36,17 +36,22 @@
 - `node --test test/places.test.mjs`：3/3 通過
 - `npx wrangler@4 pages dev`（D1 local，persist 到 repo 外）：POST 201、重複 409、`javascript:` url 400、搜尋命中/未命中、PATCH 200/404、靜態檔全 200
 - Chrome：表單新增 → 列表出現、導航連結正確、console 無錯誤
-- 尚未驗證：實際部署、PWA 安裝、Cloudflare Access
+- 尚未驗證：PWA 安裝
 
 ## 資安約束（repo 預計公開）
 - 任何金鑰（LINE channel secret 等）只放 Cloudflare secret 或本機 `.dev.vars`，不進 repo（`.gitignore` 已排除 `.dev.vars*`、`.env*`、`.wrangler/`）
-- API 本身沒有驗證，部署前必須先設好 Cloudflare Access，否則任何人都能讀寫；`/api/line/webhook` 例外，改驗 LINE 簽章
+- 登入（2026-10-12 決策：Cloudflare Zero Trust 免費方案要求綁卡，使用者選擇不綁，改自建家庭密碼）：
+  - `functions/_middleware.js` 擋所有路徑（含預覽網址），只放行 `/login`、`/login.html`、`/api/login`、`/api/line/webhook`、`/icon.svg`；未登入網頁 302 → `/login`，API 401
+  - `functions/api/login.js`：表單 POST 比對 `FAMILY_PASSWORD`（SHA-256 後定時比較），成功發 `foodmap_session` cookie（`<到期ms>.<HMAC>`，30 天，HttpOnly/Secure/SameSite=Lax）；HMAC key = `SESSION_SECRET` + `FAMILY_PASSWORD`，換密碼即全部登出；失敗固定延遲 1 秒
+  - 任一 secret 未設 → 全站 503（fail closed）
+  - `/api/line/webhook` 不經登入，安全性靠 LINE 簽章
 - 測試資料只用虛構內容，不放家人真實資料或 email
 
 ## 待決事項
 - 使用者需自備：Cloudflare 帳號、LINE Messaging API channel、家人 email 白名單
 - 申請與部署步驟見 `docs/setup/`（`cloudflare.md` → `line.md`）；LINE 只需 Channel secret（secret 名稱 `LINE_CHANNEL_SECRET`），不需 access token
-- 未實測：pages.dev 上對 `/api/line/webhook` 建 Access Bypass app（備案：自訂網域或獨立 Worker）
+- 已部署：Pages 專案名 `foodmap-edl`（`foodmap` 已被占用），正式網址 `https://foodmap-edl.pages.dev`；D1 已建立並套用 schema（使用者 2026-10-12 操作）。部署時尚未有登入功能，網站曾短暫公開（無真實資料）；登入功能合併後需重新部署並設定 `FAMILY_PASSWORD`、`SESSION_SECRET`
+- 本機 `npm run dev` 需帳號已註冊 workers.dev 子網域（AI 遠端綁定要求），使用者尚未註冊；`wrangler.toml` 的 `database_id` 使用者已在本機填入，尚未決定是否 commit（目前未 commit）
 
 ## 階段 2 驗證（2026-10-08）
 - 本機 `wrangler pages dev` + Chrome：`/?text=這家好好吃 <IG連結>&url=<IG連結>` → 表單自動展開、連結與貼文文字正確帶入、網址列清掉 query；存檔後 DB `source=share`，表單 `source` 回到 `manual`；console 無錯誤

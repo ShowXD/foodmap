@@ -1,10 +1,10 @@
 # Cloudflare 設定步驟
 
-美食地圖的網頁、API 和資料庫都放在 Cloudflare，登入由 Cloudflare Access 負責。
+美食地圖的網頁、API 和資料庫都放在 Cloudflare，登入用全家共用的「家庭密碼」。
 兩份設定文件請依這個順序做：**Cloudflare（本文件）→ [LINE](line.md)**。LINE 需要用到這裡部署出來的網址。
-「AI 自動填入」用的是 Cloudflare Workers AI 的免費額度，不需要另外申請 AI 帳號或金鑰。
+「AI 自動填入」用的是 Cloudflare Workers AI 的免費額度，不需要另外申請 AI 帳號或金鑰。全部步驟都**不需要綁信用卡**。
 
-> ⚠️ **API 本身沒有登入檢查。** 第 6 步的 Access 沒設好之前，知道網址的人都能讀寫你們的清單。請一次做完第 1～6 步，中間不要把網址分享出去。
+> ℹ️ 第 5 步設好家庭密碼之前，網站會一律回「登入尚未設定」（HTTP 503）。網站在沒設密碼時是鎖住的，不會變成公開。
 
 全部指令都在 repo 根目錄執行。
 
@@ -80,77 +80,77 @@ npm run deploy
 - 免費方案超過額度時只會失敗、不會扣款，App 會顯示「AI 暫時無法使用」，手動填寫照常能用。
 - 用量可以在控制台的 **AI** → **Workers AI** 查看。
 
-## 5. 設定金鑰（secret）
+## 5. 設定家庭密碼與金鑰（secret）
 
-金鑰只能放在 Cloudflare secret，**絕對不要寫進任何會被 commit 的檔案**。目前只有 LINE 需要：
+密碼和金鑰只能放在 Cloudflare secret，**絕對不要寫進任何會被 commit 的檔案**，也不要貼到聊天或截圖裡。
+
+### 5-1 家庭密碼 `FAMILY_PASSWORD`
+
+全家共用的登入密碼。建議用 4 個以上不相關的詞組成，例如「藍色 腳踏車 鳳梨 圖書館」這種形式，**不要照抄這個範例**。
 
 ```bash
-npx wrangler pages secret put LINE_CHANNEL_SECRET    # 取得方式見 line.md
+npx wrangler pages secret put FAMILY_PASSWORD
 ```
 
-指令會要你貼上值，輸入時不會顯示在畫面上。設定完再部署一次比較保險：`npx wrangler pages deploy`。
+指令會要你貼上值，輸入時不會顯示在畫面上。
 
-> 本機開發要用金鑰時，放在 repo 根目錄的 `.dev.vars`（`.gitignore` 已排除），格式是 `LINE_CHANNEL_SECRET=...`，一行一個。
-> **本機開發（`npm run dev`）必須先 `npx wrangler login`。** `wrangler.toml` 裡的 AI 綁定一定要連到 Cloudflare，沒登入時 dev server 會直接啟動失敗，連清單功能都不能用。本機測試 AI 的用量也算在同一份免費額度裡。
+### 5-2 簽章金鑰 `SESSION_SECRET`
 
-## 6. 用 Cloudflare Access 限制只有家人能登入
-
-Access 免費方案最多 50 位使用者（此數字來自第三方整理，Cloudflare 官方方案頁未能確認）。
-
-### 6-1 開啟「一次性密碼（One-time PIN）」登入方式
-
-**Zero Trust** → **Integrations** → **Identity providers** → **Add new identity provider** → **One-time PIN**
-
-家人登入時輸入 email，信箱會收到驗證碼，不需要另外註冊帳號。
-
-### 6-2 保護正式網址
-
-`*.pages.dev` 不是你帳號裡的網域，沒辦法照一般流程直接新增，要用 Cloudflare 文件寫的繞法（[官方說明](https://developers.cloudflare.com/pages/platform/known-issues/#enable-access-on-your-pagesdev-domain)）：
-
-1. **Workers & Pages** → `foodmap` → **Settings** → 找到 **Enable access policy** 並開啟。
-   這時建立的 Access 應用程式只保護預覽網址 `*.foodmap.pages.dev`。
-2. 點 **Manage** → **Configure**，在 **Public hostname** 的 **Subdomain** 欄位把 `*` 刪掉後儲存（若報錯，先幫應用程式改個名字再存）。
-   這樣它就改成保護正式網址 `foodmap.pages.dev`。
-3. 回到 Pages 的 **Settings**，再按一次 **Enable access policy**，重新保護預覽網址。
-   最後會有兩個 Access 應用程式，一個管正式網址、一個管預覽網址。
-
-> 預覽網址（每次部署都會產生一個）預設是公開的，所以第 3 步不能省。
-
-### 6-3 設定允許名單
-
-在上面兩個應用程式的 **Policies** 各加一條：
-
-- Action：**Allow**
-- Include → **Emails** → 填入家人的 email
-
-沒被列入的人一律擋下（Access 預設拒絕）。家人的 email 只填在 Cloudflare 控制台，不要寫進 repo。
-
-### 6-4 讓 LINE webhook 路徑繞過 Access
-
-LINE 伺服器無法登入，所以 `/api/line/webhook` 要另開一個 Access 應用程式放行。安全性改由程式驗證 LINE 簽章（`x-line-signature`）把關。
-
-1. **Zero Trust** → **Access controls** → **Applications** → **Create new application** → **Self-hosted and private**
-2. Public hostname 填 `foodmap.pages.dev`，**Path** 填 `api/line/webhook`
-   （如果下拉選單選不到 pages.dev，試試 **Switch to custom input**）
-3. Policy：Action 選 **Bypass**，Include → **Everyone**
-
-路徑比較長的規則優先，而且不會繼承上層的允許名單。
-
-> ⚠️ 未驗證：「在 pages.dev 網域上用 UI 建立單一路徑的 Bypass」這一步目前還沒實測過，第四階段 LINE webhook 完成後要測。
-> 如果不行，備案是改用自訂網域，或把 webhook 拆成獨立的 Worker。
-
-## 7. 驗證
+這把金鑰只用來簽登入 cookie，家人不需要知道。用下面這行直接產生隨機值並存進去，值不會顯示在畫面上：
 
 ```bash
-# 應該被導到 Cloudflare Access 登入頁（HTTP 302，Location 指向 cloudflareaccess.com）
-curl -sI https://foodmap.pages.dev/ | head -5
-curl -sI https://foodmap.pages.dev/api/places | head -5
+node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))" | npx wrangler pages secret put SESSION_SECRET
+```
 
-# 第四階段完成後：應該直接打到 Function（回 401 或 405，而不是 302）
+### 5-3 重新部署
+
+```bash
+npm run deploy
+```
+
+secret 在下次部署後才會生效。
+
+### 之後要換密碼
+
+再執行一次 5-1 並重新部署。**所有已登入的人都會被自動登出**，要用新密碼重新登入。懷疑密碼外洩時就這樣做。
+
+### LINE 的金鑰
+
+`LINE_CHANNEL_SECRET` 的設定方式見 [line.md](line.md)。
+
+### 本機開發
+
+- 本機用的密碼放在 repo 根目錄的 `.dev.vars`（`.gitignore` 已排除），一行一個，例如：
+
+  ```
+  FAMILY_PASSWORD=本機測試用的密碼
+  SESSION_SECRET=本機測試用的隨機字串
+  ```
+
+- **`npm run dev` 必須先 `npx wrangler login`。** `wrangler.toml` 裡的 AI 綁定一定要連到 Cloudflare。
+- 第一次在本機跑時，如果出現 `You need to register a workers.dev subdomain`，到控制台 **Workers & Pages** 依畫面指示註冊一個 workers.dev 子網域（免費、不用綁卡）就好。
+- 本機測試 AI 的用量也算在同一份免費額度裡。
+
+## 6. 驗證
+
+```bash
+# 沒登入：網頁會被導到 /login（HTTP 302），API 回 401
+curl -sI https://foodmap.pages.dev/ | head -5
+curl -si https://foodmap.pages.dev/api/places | head -5
+
+# LINE webhook 不需要登入（安全性改由 LINE 簽章把關）；第四階段完成前會回 405
 curl -si -X POST https://foodmap.pages.dev/api/line/webhook | head -5
 ```
 
-最後用手機開網址，輸入家人 email 收驗證碼登入，再把網頁「加到主畫面」安裝成 App。
+網址換成你自己的 Pages 網址；如果專案名稱被用掉，會是像 `foodmap-xxx.pages.dev` 這樣。
+
+最後用手機開網址，輸入家庭密碼登入，再把網頁「加到主畫面」安裝成 App。登入狀態會保留 30 天。
+
+### 登入怎麼運作（給之後維護的人）
+
+- `functions/_middleware.js` 會擋下所有沒登入的請求，**包含每次部署產生的預覽網址**。只放行 `/login`、`/api/login`、`/api/line/webhook`、`/icon.svg`。
+- 登入成功後會發一個 HttpOnly、Secure、SameSite=Lax 的 cookie，內容是到期時間加上 HMAC 簽章，用 `SESSION_SECRET` 和 `FAMILY_PASSWORD` 一起簽。
+- 密碼錯誤時固定延遲 1 秒。如果發現有人大量猜密碼，可以在 Cloudflare 控制台對 `/api/login` 加一條 Rate limiting rule。
 
 ---
 
@@ -169,5 +169,4 @@ npx wrangler pages deploy
 - Pages 綁定：<https://developers.cloudflare.com/pages/functions/bindings/>
 - Workers AI 價格與免費額度：<https://developers.cloudflare.com/workers-ai/platform/pricing/>
 - Workers AI JSON 模式：<https://developers.cloudflare.com/workers-ai/features/json-mode/>
-- One-time PIN：<https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/>
-- Access 路徑規則：<https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/>
+- Pages Functions middleware：<https://developers.cloudflare.com/pages/functions/middleware/>

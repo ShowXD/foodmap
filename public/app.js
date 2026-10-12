@@ -14,6 +14,10 @@ async function api(method, body, query = '', path = '/api/places') {
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (response.status === 401) {
+    location.href = '/login';
+    throw new Error('請重新登入');
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), { status: response.status });
   return payload;
