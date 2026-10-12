@@ -42,5 +42,13 @@ CREATE TABLE IF NOT EXISTS places (
   created_by INTEGER REFERENCES users (id)
 );
 
+-- Per-user daily AI extraction count (day = UTC YYYY-MM-DD) to protect the shared free quota.
+CREATE TABLE IF NOT EXISTS extract_usage (
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  day TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, day)
+);
+
 CREATE INDEX IF NOT EXISTS places_url ON places (url);
 CREATE INDEX IF NOT EXISTS places_list ON places (list_id);

@@ -4,11 +4,17 @@ const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 
 const SEARCH_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'note', 'caption'];
 const SOURCES = ['line', 'share', 'manual'];
 const STATUSES = ['todo', 'visited'];
+// Caps keep one row (and the LIKE search) small; captions mirror the AI extraction limit.
+const MAX_FIELD_LENGTH = { caption: 5000, note: 2000 };
+const DEFAULT_MAX_FIELD_LENGTH = 500;
+const MAX_URL_LENGTH = 2048;
+const MAX_QUERY_LENGTH = 100;
 
 const json = (body, status = 200) => Response.json(body, { status });
 
 // Rejects javascript:/data: URLs, since the url is rendered as a link.
 export function isHttpUrl(text) {
+  if (typeof text !== 'string' || text.length > MAX_URL_LENGTH) return false;
   try {
     return ['http:', 'https:'].includes(new URL(text).protocol);
   } catch {
@@ -23,6 +29,7 @@ export function pickFields(body) {
     if (body[key] === undefined) continue;
     if (typeof body[key] !== 'string') return { error: `${key} must be a string` };
     fields[key] = body[key].trim();
+    if (fields[key].length > (MAX_FIELD_LENGTH[key] ?? DEFAULT_MAX_FIELD_LENGTH)) return { error: `${key} is too long` };
   }
   if (fields.status !== undefined && !STATUSES.includes(fields.status)) {
     return { error: 'invalid status' };
@@ -45,7 +52,7 @@ export async function onRequestGet({ request, env, data }) {
   const list = await findAccessibleList(env.DB, data.user, Number(params.get('list')));
   if (!list) return listNotFound();
 
-  const query = params.get('q')?.trim();
+  const query = params.get('q')?.trim().slice(0, MAX_QUERY_LENGTH);
   // ponytail: LIKE full scan per list, fine for hundreds of rows; switch to FTS5 if it gets slow
   const search = query ? `AND (${SEARCH_FIELDS.map((f) => `${f} LIKE ?2`).join(' OR ')})` : '';
   const statement = env.DB.prepare(`SELECT * FROM places WHERE list_id = ?1 ${search} ORDER BY created_at DESC, id DESC`);

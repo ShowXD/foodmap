@@ -113,7 +113,17 @@
 4. Google 地圖：開 App 即為地圖、顯示已存店家標點與使用者目前位置；**使用者同意綁卡**使用 Google Maps Platform（Maps JS + Geocoding，需 Google Cloud 專案與帳單帳戶；Google 登入可用同一專案）
 5. LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）、AI 擷取可多店、處理 `unsend`（需記 LINE message id）
 
+## 資安檢查與修正（2026-10-12）
+- 由資安檢查 agent 唯讀審查全專案：無 Critical/High。已修（分支 `fix/security-hardening`）：
+  - M1 CSRF：middleware 擋非安全方法的跨站請求（`Sec-Fetch-Site`≠same-origin 或 `Origin` 不符 → 403）
+  - M2 安全標頭：middleware 對所有回應加 CSP（`script-src 'self'`、`frame-ancestors 'none'` 等）、XFO DENY、nosniff、Referrer-Policy；`pending/admin/members` 內嵌 script 移到 `public/*.js`
+  - M3 AI 濫用：`extract_usage` 表，每人每日 30 次（`migrations/0005_extract_usage.sql`）
+  - L1 擷取轉址後再驗網域、最多讀 512 KB；L2 JWT 解析錯誤／certs 失敗回 null（401）；L3 強制重抓 certs 最少間隔 60 秒；L4 middleware 改為只放行 `approved`、`/api/users` 不能設 pending；L6 欄位／網址／搜尋長度上限；L7 `/api/*` 加 `Cache-Control: no-store`
+  - 未修：L5（群組擁有者可試探 email 是否註冊，一家人使用可忽略）；作者 email 在 commit 中——使用者選擇維持（已公開於 GitHub）
+- 驗證：`npm test` 27/27；scratch 本機 wrangler 確認回應帶 CSP/XFO/nosniff、`/api/*` no-store、跨站 POST 403、同站 POST 201；Chrome 在 CSP 下主頁新增店家、管理頁、成員頁皆正常，嵌入 iframe 被 frame-ancestors 擋下
+- Access 登入有效期預設 24 小時，文件已說明可調至最長 1 個月與遺失手機時撤銷工作階段
+
 ## 下一步
-1. 使用者（進行中）：Access 已建兩個應用程式且正式網址已被 Access 保護（2026-10-12 驗證 302 → blue-mouse-e3db.cloudflareaccess.com）、Google 登入已連線；待把兩個應用程式原則改為 Include Emails（家人白名單）、登入方法僅 One-time PIN + Google；Google OAuth 保持測試中並加家人為測試使用者；設 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`；remote 依序跑 0002（若尚未）、0003、0004；`npm run deploy`；刪除舊部署
+1. 使用者（進行中）：Access 已建兩個應用程式且正式網址已被 Access 保護（2026-10-12 驗證 302 → blue-mouse-e3db.cloudflareaccess.com）、Google 登入已連線；待把兩個應用程式原則改為 Include Emails（家人白名單）、登入方法僅 One-time PIN + Google；Google OAuth 保持測試中並加家人為測試使用者；設 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
 3. 路線圖：Google 地圖、LINE Bot

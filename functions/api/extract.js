@@ -6,6 +6,10 @@ const MAX_CAPTION_LENGTH = 5000;
 const SOCIAL_HOSTS = ['instagram.com', 'facebook.com', 'fb.watch', 'fb.com'];
 const FIELD_NAMES = ['name', 'dishes', 'area', 'address', 'tags'];
 const MAX_PLACES = 10;
+// og tags sit in <head>, so the first 512 KB is plenty and caps memory per request.
+const MAX_PAGE_BYTES = 512 * 1024;
+// Keeps one account from burning the shared daily free AI quota.
+export const DAILY_EXTRACT_LIMIT = 30;
 
 const PLACE_SCHEMA = {
   type: 'object',
@@ -69,15 +73,53 @@ async function fetchCaption(url) {
       headers: { 'User-Agent': 'facebookexternalhit/1.1', 'Accept-Language': 'zh-TW,zh;q=0.9' },
       signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) return '';
-    return parseOgText(await response.text());
+    // Redirects (e.g. l.facebook.com link shims) could land on any host; only read IG/FB pages.
+    if (!response.ok || !isSocialUrl(response.url || url)) {
+      await response.body?.cancel();
+      return '';
+    }
+    return parseOgText(await readLimited(response, MAX_PAGE_BYTES));
   } catch (error) {
     console.warn('Caption fetch failed', url, error.message);
     return '';
   }
 }
 
-export async function onRequestPost({ request, env }) {
+async function readLimited(response, maxBytes) {
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (total < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+  }
+  await reader.cancel();
+  const bytes = new Uint8Array(Math.min(total, maxBytes));
+  let offset = 0;
+  for (const chunk of chunks) {
+    const slice = chunk.subarray(0, bytes.length - offset);
+    bytes.set(slice, offset);
+    offset += slice.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+// Counts the call up front (UTC day) and reports whether it is still within the daily limit.
+async function takeDailyQuota(db, userId) {
+  const day = new Date().toISOString().slice(0, 10);
+  const row = await db
+    .prepare(
+      `INSERT INTO extract_usage (user_id, day, count) VALUES (?1, ?2, 1)
+       ON CONFLICT (user_id, day) DO UPDATE SET count = count + 1 RETURNING count`,
+    )
+    .bind(userId, day)
+    .first();
+  return row.count <= DAILY_EXTRACT_LIMIT;
+}
+
+export async function onRequestPost({ request, env, data }) {
   if (!env.AI) return json({ error: 'AI 擷取尚未設定 Workers AI 綁定' }, 503);
 
   const body = await request.json().catch(() => null);
@@ -88,6 +130,9 @@ export async function onRequestPost({ request, env }) {
   if (!caption && isSocialUrl(url)) caption = await fetchCaption(url);
   if (!caption) return json({ error: '抓不到貼文文字，請把貼文內容貼到「貼文文字」再試一次', needCaption: true }, 422);
   if (caption.length > MAX_CAPTION_LENGTH) return json({ error: `貼文文字超過 ${MAX_CAPTION_LENGTH} 字` }, 413);
+  if (!(await takeDailyQuota(env.DB, data.user.id))) {
+    return json({ error: `今天的 AI 擷取已達 ${DAILY_EXTRACT_LIMIT} 次上限，請手動填寫或明天再試` }, 429);
+  }
 
   let result;
   try {

@@ -132,6 +132,13 @@ npm run deploy
 
 再到兩個應用程式的 **Additional settings**，各抄下 **Application Audience (AUD) Tag**。
 
+**登入要維持多久（Session Duration）**：預設 24 小時，過期就要重新登入。在兩個應用程式的設定裡把 **工作階段持續時間（Session Duration）** 調長，一般家用設 1 週到 1 個月都合理，最長 1 個月。
+
+- 期限越長越方便，但手機遺失時，撿到的人在期限內都能打開 App。
+- 遺失時的處理：**Zero Trust** → **團隊與資源** → **使用者** → 找到那個人 → **撤銷工作階段（Revoke session）**，他所有裝置會立刻登出。必要時再到 App 的「管理」頁停用帳號。
+- App 右上角的「登出」會結束 Access 的登入，換帳號時使用。
+- iPhone「加到主畫面」的 App 和 Safari 的登入是分開的，兩邊各要登入一次。
+
 ### 5-4 讓 LINE webhook 路徑繞過 Access
 
 LINE 伺服器沒辦法登入，所以 `/api/line/webhook` 要另開一個應用程式放行。安全性改由程式驗證 LINE 簽章把關。
@@ -202,8 +209,19 @@ curl -si -X POST https://<專案>.pages.dev/api/line/webhook | head -5
 
 ### 登入怎麼運作（給之後維護的人）
 
-- `functions/_middleware.js` 會用 `lib/access.js` 驗證 `Cf-Access-Jwt-Assertion`：RS256 簽章、`iss` 是 team 網域、`aud` 在 `ACCESS_AUD` 裡、而且沒過期。公鑰從 `<team>/cdn-cgi/access/certs` 取得，快取 1 小時；遇到沒看過的 kid 會重抓一次。
-- 驗證通過後，用 `lib/users.js` 建立或讀取 `users` 紀錄。被停用的帳號，網頁會被導到 `/pending`，API 回 403；只放行 `/pending`、`/api/me`、`/icon.svg`。
+- `functions/_middleware.js` 會用 `lib/access.js` 驗證 `Cf-Access-Jwt-Assertion`：
+  - 檢查 RS256 簽章、`iss` 是 team 網域、`aud` 在 `ACCESS_AUD` 裡、而且沒過期。
+  - 公鑰從 `<team>/cdn-cgi/access/certs` 取得，快取 1 小時。遇到沒看過的 kid 會重抓，但最少間隔 60 秒。
+  - 任何解析錯誤或抓不到公鑰都會拒絕（401），不會變成 500。
+- 驗證通過後，用 `lib/users.js` 建立或讀取 `users` 紀錄。只有狀態是 `approved` 的帳號能使用；被停用（或殘留舊的 `pending` 狀態）的帳號，網頁會被導到 `/pending`，API 回 403。這時只放行 `/pending`、`/pending.js`、`/api/me`、`/icon.svg`。
+- **跨站請求防護（CSRF）**：非 GET/HEAD/OPTIONS 的請求，若 `Sec-Fetch-Site` 不是 `same-origin`，或 `Origin` 與網站不同，一律回 403。
+- **安全標頭**：所有回應都由 middleware 加上：
+  - CSP：`script-src 'self'`、`frame-ancestors 'none'`，所以頁面**不能有內嵌 `<script>` 或 `onclick=`**，程式都要放在獨立的 `.js` 檔。
+  - `X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: same-origin`。
+  - `/api/*` 另外加上 `Cache-Control: no-store`。
+  - 之後接 Google 地圖時，要在 CSP 加上 Google 的網域。
+- AI 擷取每人每天上限 30 次，記在 `extract_usage` 表，避免一個帳號用光全家的免費額度。抓貼文時若被轉址到非 IG/FB 網域就不讀，最多只讀 512 KB。
+- 店家欄位有長度上限：一般欄位 500 字、備註 2000 字、貼文文字 5000 字、網址 2048 字、搜尋字串 100 字。
 - 清單權限在 `lib/lists.js`：
   - 個人清單只有本人能用，**網站管理員也看不到**。
   - 群組清單限群組成員，網站管理員則可以看所有群組。
@@ -233,6 +251,7 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0002_multi_place.sql` | 一則影片可以存多家店（拿掉網址不可重複的限制，資料保留） | 2026-10-12 以前用 `schema.sql` 建的資料庫 |
 | `0003_users.sql` | 新增 `users` 表（個人帳號） | 還沒有 `users` 表的資料庫 |
 | `0004_lists.sql` | 個人清單與群組清單；舊店家搬進「家人」群組；取消審核 | 跑過 0003、還沒有 `lists` 表的資料庫 |
+| `0005_extract_usage.sql` | AI 擷取每人每日次數紀錄（上限 30 次） | 還沒有 `extract_usage` 表的資料庫 |
 
 全新建立的資料庫只要跑 `schema.sql`，它已經是最新結構，不用再跑 `migrations/`。
 

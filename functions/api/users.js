@@ -1,4 +1,5 @@
-const STATUSES = ['pending', 'approved', 'disabled'];
+// 'pending' only exists in old rows (approval was removed); the middleware treats it as blocked.
+const STATUSES = ['approved', 'disabled'];
 const json = (body, status = 200) => Response.json(body, { status });
 const forbidden = () => json({ error: 'admin only' }, 403);
 

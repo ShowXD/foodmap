@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isSocialUrl, parseOgText, parsePlaces, onRequestPost } from '../functions/api/extract.js';
+import { isSocialUrl, parseOgText, parsePlaces, onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
+import { ensureUser } from '../lib/users.js';
+import { createTestDb } from './d1.mjs';
 
 const post = (body) => new Request('http://localhost/api/extract', { method: 'POST', body: JSON.stringify(body) });
 
@@ -43,16 +45,35 @@ test('extract asks for caption when it cannot fetch one', async () => {
   assert.equal((await response.json()).needCaption, true);
 });
 
+async function asUser(email) {
+  const DB = createTestDb();
+  const user = await ensureUser(DB, email, {});
+  return (body, AI) => onRequestPost({ request: post(body), env: { DB, AI }, data: { user } });
+}
+
 test('extract returns every shop the AI found, 422 when none, and 502 when AI fails', async () => {
+  const extract = await asUser('mom@example.test');
   const twoShops = { places: [{ name: '阿宗麵線', dishes: '麵線' }, { name: '林東芳牛肉麵', dishes: '牛肉麵' }] };
-  const ok = await onRequestPost({ request: post({ caption: '一次吃兩家' }), env: { AI: { run: async () => ({ response: twoShops }) } } });
+  const ok = await extract({ caption: '一次吃兩家' }, { run: async () => ({ response: twoShops }) });
   assert.equal(ok.status, 200);
   assert.deepEqual((await ok.json()).places.map((place) => place.name), ['阿宗麵線', '林東芳牛肉麵']);
 
-  const none = await onRequestPost({ request: post({ caption: '今天天氣好' }), env: { AI: { run: async () => ({ response: { places: [] } }) } } });
+  const none = await extract({ caption: '今天天氣好' }, { run: async () => ({ response: { places: [] } }) });
   assert.equal(none.status, 422);
 
-  const failingAI = { run: async () => { throw new Error('daily limit'); } };
-  const failed = await onRequestPost({ request: post({ caption: '阿宗麵線' }), env: { AI: failingAI } });
+  const failed = await extract({ caption: '阿宗麵線' }, { run: async () => { throw new Error('daily limit'); } });
   assert.equal(failed.status, 502);
+});
+
+test('each user gets a daily AI extraction limit; the AI is not called once it is used up', async () => {
+  const extract = await asUser('mom@example.test');
+  let aiCalls = 0;
+  const AI = { run: async () => { aiCalls++; return { response: { places: [{ name: '店' }] } }; } };
+  for (let i = 0; i < DAILY_EXTRACT_LIMIT; i++) assert.equal((await extract({ caption: '店' }, AI)).status, 200);
+  assert.equal((await extract({ caption: '店' }, AI)).status, 429);
+  assert.equal(aiCalls, DAILY_EXTRACT_LIMIT);
+
+  // Another family member has their own quota.
+  const otherExtract = await asUser('kid@example.test');
+  assert.equal((await otherExtract({ caption: '店' }, AI)).status, 200);
 });

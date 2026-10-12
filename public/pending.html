@@ -27,14 +27,6 @@
     <p class="muted" id="email-text"></p>
     <p><a href="/">重新整理</a> · <a href="/cdn-cgi/access/logout">換帳號登入</a></p>
   </main>
-  <script>
-    fetch('/api/me').then((response) => response.json()).then(({ email, status }) => {
-      if (status !== 'disabled') return location.replace('/');
-      document.getElementById('status-text').textContent = '這個帳號已被停用，有問題請聯絡網站管理員。';
-      document.getElementById('email-text').textContent = `登入帳號：${email}`;
-    }).catch(() => {
-      document.getElementById('status-text').textContent = '讀取帳號狀態失敗，請稍後重新整理。';
-    });
-  </script>
+  <script src="pending.js" type="module"></script>
 </body>
 </html>
