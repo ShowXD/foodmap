@@ -15,13 +15,13 @@
    - 注意：hidden input 設值會連預設值一起改，表單 reset 後必須手動設回 `manual`
 2.5 編輯店家 — **已實作、本機驗證通過**
    - 卡片「編輯」把資料帶入同一張表單（url 唯讀、hidden `id`），送出改走 PATCH；「取消編輯」還原表單
-3. AI 擷取 — **已實作；單元測試通過，尚未實測擷取品質（需登入 Cloudflare）**
+3. AI 擷取 — **已實作；使用者 2026-10-12 在正式環境實測可成功填入**（發現一則影片可能有多家店 → 已做多店功能）
    - `functions/api/extract.js`：POST `{url, caption}`；沒 caption 時只對 IG/FB 網域（`isSocialUrl`）抓 og:title/og:description；用 Workers AI 綁定 `env.AI` 跑 `@cf/meta/llama-3.3-70b-instruct-fp8-fast`（JSON 模式 `response_format: json_schema`），`parseFields` 同時接受物件或 JSON 字串，回傳 `{caption, fields}`
    - 決策（2026-10-08）：使用者不想付費，從 Claude Haiku 4.5（需預付儲值，無免費方案）改為 Workers AI 免費額度（每日 10,000 neurons，一次約 70）；已移除 `@anthropic-ai/sdk`，`docs/setup/anthropic.md` 刪除
    - 前端「✨ AI 自動填入」只填空白欄位，不覆蓋手打內容；422 時游標跳到貼文文字欄
    - `package.json`：只有 devDependency `wrangler`（使用者要求以專案內版本隔離，避免全域安裝或 `npx wrangler@4` 另抓版本）；scripts：`npm test`（`node --test`）、`npm run dev`（`wrangler pages dev`）、`npm run deploy`（`wrangler pages deploy`）
    - 注意：`wrangler login` 憑證在使用者層級（`%APPDATA%\xdg.config\.wrangler`），各專案共用；需分帳號時改用專案 `.env` 的 `CLOUDFLARE_API_TOKEN`（使用者尚未要求）
-4. LINE Bot webhook 自動收連結（驗 `x-line-signature`）— 未開始
+4. LINE Bot webhook 自動收連結（驗 `x-line-signature`）— 未開始（排在路線圖最後，見下方「已核准的路線圖」）
    - 已查證：LINE Messaging API **沒有**對訊息加表情回應的 API；Bot 將完全靜默（不回覆）
    - 要處理 `unsend` 事件：訊息被收回時刪除對應的已存連結
    - 群組內 Bot 會收到所有訊息，只保存比對到的 IG/FB 連結，其餘不存
@@ -73,6 +73,21 @@
 - 家人會事先被告知群組有 Bot
 - 要有 Cloudflare、Anthropic、LINE 三份申請步驟文件（`docs/setup/`）
 
+## 多店功能（2026-10-12，已實作、本機驗證通過）
+- 一則影片可存多家店：`places.url` 拿掉 UNIQUE（改一般索引 `places_url`）；重複判定改為「同 url 且同店名」（`COALESCE(name,'')`）
+- 既有資料庫升級：`migrations/0002_multi_place.sql`（重建表、保留資料），**部署前要對 remote 執行一次**；`schema.sql` 已是新結構
+- `/api/extract` 回傳改為 `{caption, places: [...]}`（`parsePlaces`，最多 10 家，丟掉全空的項目，也接受模型只回單一物件）
+- 前端：AI 找到 1 家（或編輯中）→ 只填空白欄位；多家 → 候選清單（預設全勾）→「儲存勾選的店家」逐筆 POST，回報已存／重複／失敗數
+- 驗證：`npm test` 13/13；scratch 本機 D1 先建舊 schema + 資料 → 遷移前同 url 第二家被 UNIQUE 擋、遷移後可存且原資料與 status 保留；Chrome（以假 `/api/extract` 回應）測多店勾選儲存、重複判定、單店只填空白欄位
+- 未驗證：正式環境 Workers AI 對多店貼文的實際擷取品質
+
+## 已核准的路線圖（2026-10-12，依序，每項一個分支）
+1. ✅ 多店（本節上方）
+2. 個人帳號：三種登入方式都要——LINE Login、Google 登入、自建帳號密碼；**管理員審核制**（首次登入為待審核，管理員在 App 內核准／停用）；取代家庭密碼
+3. 個人化：共用清單 + 記錄誰新增 +「吃過了」改為每人各自標記
+4. Google 地圖：開 App 即為地圖、顯示已存店家標點與使用者目前位置；**使用者同意綁卡**使用 Google Maps Platform（Maps JS + Geocoding，需 Google Cloud 專案與帳單帳戶；Google 登入可用同一專案）
+5. LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）、AI 擷取可多店、處理 `unsend`（需記 LINE message id）
+
 ## 下一步
-1. 階段 4 LINE Bot webhook：`functions/api/line/webhook.js`，驗 `x-line-signature`、只存 IG/FB 連結（`source='line'`）並背景跑 AI 擷取、處理 `unsend`（需在 `places` 加 LINE message id 欄位）
-2. 使用者建好 Cloudflare 帳號並 `npx wrangler login` 後：用幾則真實貼文實測 Workers AI 擷取品質（繁中、店名準確度），不理想再評估換模型
+1. 使用者：對 remote 執行 `migrations/0002_multi_place.sql` 後再 `npm run deploy`
+2. 路線圖第 2 項個人帳號（需先確認：Workers 免費方案每請求 CPU 10ms，自建密碼的 PBKDF2 雜湊可能超時，要實測或調整做法）

@@ -160,7 +160,19 @@ curl -si -X POST https://foodmap.pages.dev/api/line/webhook | head -5
 npm run deploy
 ```
 
-資料表結構有變動時，要再對 `--remote` 執行一次對應的 SQL。
+### 資料表結構有變動時
+
+`migrations/` 資料夾裡的 SQL 檔是給**已經建好的資料庫**升級用的，依編號順序各執行一次就好，**要在部署新程式之前執行**：
+
+```bash
+npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
+```
+
+| 檔案 | 內容 | 誰需要跑 |
+|---|---|---|
+| `0002_multi_place.sql` | 一則影片可以存多家店（拿掉網址不可重複的限制，資料保留） | 2026-10-12 以前用 `schema.sql` 建的資料庫 |
+
+全新建立的資料庫只要跑 `schema.sql`，它已經是最新結構，不用再跑 `migrations/`。
 
 ### ⚠️ 修正資安問題後，要刪掉舊部署
 

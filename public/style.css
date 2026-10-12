@@ -61,6 +61,12 @@ input:read-only { color: var(--muted); }
 #add-form { display: grid; gap: 10px; }
 #add-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 
+#ai-candidates { display: grid; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+#ai-candidates[hidden] { display: none; }
+#ai-candidates legend { color: var(--muted); font-size: 0.9rem; }
+.candidate { display: flex; gap: 8px; align-items: center; }
+.candidate input { width: auto; }
+
 #list-message, #form-message { color: var(--muted); margin: 8px 0; }
 
 #place-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }

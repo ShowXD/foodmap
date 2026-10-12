@@ -23,6 +23,11 @@
         <input name="id" type="hidden" value="">
         <label>影片連結 <input name="url" type="url" required placeholder="https://www.instagram.com/reel/…"></label>
         <button id="ai-fill" type="button" class="secondary">✨ AI 自動填入（抓不到時先貼上貼文文字）</button>
+        <fieldset id="ai-candidates" hidden>
+          <legend>AI 找到好幾家店，勾選要存的</legend>
+          <div id="candidate-list"></div>
+          <button id="save-candidates" type="button">儲存勾選的店家</button>
+        </fieldset>
         <label>店名 <input name="name"></label>
         <label>食物 <input name="dishes" placeholder="牛肉麵、滷味"></label>
         <label>地區 <input name="area" placeholder="台北 大安"></label>

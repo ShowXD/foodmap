@@ -79,7 +79,72 @@ function resetForm() {
   addForm.querySelector('button[type="submit"]').textContent = '儲存';
   addPanel.querySelector('summary').textContent = '＋ 新增一家店';
   cancelEditButton.hidden = true;
+  hideCandidates();
 }
+
+const candidatesPanel = document.getElementById('ai-candidates');
+const candidateList = document.getElementById('candidate-list');
+const saveCandidatesButton = document.getElementById('save-candidates');
+let candidates = [];
+
+// Only fill blanks so AI never overwrites what someone typed by hand.
+function fillBlanks(place) {
+  for (const [field, text] of Object.entries(place)) {
+    if (text && !addForm.elements[field].value.trim()) addForm.elements[field].value = text;
+  }
+}
+
+function showCandidates(places) {
+  candidates = places;
+  candidateList.replaceChildren(...places.map((place, index) => {
+    const label = document.createElement('label');
+    label.className = 'candidate';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.value = index;
+    const summary = document.createElement('span');
+    summary.textContent = [place.name || '（未填店名）', place.dishes, place.area].filter(Boolean).join('・');
+    label.append(checkbox, summary);
+    return label;
+  }));
+  candidatesPanel.hidden = false;
+}
+
+function hideCandidates() {
+  candidates = [];
+  candidateList.replaceChildren();
+  candidatesPanel.hidden = true;
+}
+
+saveCandidatesButton.addEventListener('click', async () => {
+  const chosen = [...candidateList.querySelectorAll('input:checked')].map((checkbox) => candidates[checkbox.value]);
+  if (chosen.length === 0) {
+    formMessage.textContent = '請至少勾選一家店';
+    return;
+  }
+  const { url, caption, source, note } = addForm.elements;
+  saveCandidatesButton.disabled = true;
+  formMessage.textContent = '儲存中…';
+  const counts = { saved: 0, duplicate: 0, failed: 0 };
+  for (const place of chosen) {
+    try {
+      await api('POST', { ...place, url: url.value, caption: caption.value, source: source.value, note: note.value });
+      counts.saved++;
+    } catch (error) {
+      if (error.status === 409) counts.duplicate++;
+      else counts.failed++;
+    }
+  }
+  saveCandidatesButton.disabled = false;
+  formMessage.textContent = [
+    `已儲存 ${counts.saved} 家`,
+    counts.duplicate && `${counts.duplicate} 家之前存過`,
+    counts.failed && `${counts.failed} 家失敗，請檢查影片連結後再試`,
+  ].filter(Boolean).join('，');
+  if (counts.failed === 0) resetForm();
+  loadPlaces();
+});
 
 const aiFillButton = document.getElementById('ai-fill');
 aiFillButton.addEventListener('click', async () => {
@@ -93,11 +158,15 @@ aiFillButton.addEventListener('click', async () => {
   try {
     const extracted = await api('POST', { url: url.value, caption: caption.value }, '', '/api/extract');
     caption.value = extracted.caption;
-    // Only fill blanks so AI never overwrites what someone typed by hand.
-    for (const [field, text] of Object.entries(extracted.fields)) {
-      if (text && !addForm.elements[field].value.trim()) addForm.elements[field].value = text;
+    const isEditing = Boolean(addForm.elements.id.value);
+    if (extracted.places.length === 1 || isEditing) {
+      hideCandidates();
+      fillBlanks(extracted.places[0]);
+      formMessage.textContent = 'AI 已填入，請確認後再儲存';
+    } else {
+      showCandidates(extracted.places);
+      formMessage.textContent = `AI 找到 ${extracted.places.length} 家店，勾選要存的再按「儲存勾選的店家」`;
     }
-    formMessage.textContent = 'AI 已填入，請確認後再儲存';
   } catch (error) {
     formMessage.textContent = error.message;
     if (error.status === 422) caption.focus();

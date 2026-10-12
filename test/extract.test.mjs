@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isSocialUrl, parseOgText, parseFields, onRequestPost } from '../functions/api/extract.js';
+import { isSocialUrl, parseOgText, parsePlaces, onRequestPost } from '../functions/api/extract.js';
 
 const post = (body) => new Request('http://localhost/api/extract', { method: 'POST', body: JSON.stringify(body) });
 
@@ -20,12 +20,16 @@ test('parseOgText reads both attribute orders and decodes entities', () => {
   assert.equal(parseOgText('<html></html>'), '');
 });
 
-test('parseFields accepts object or JSON string and fills missing keys', () => {
-  const expected = { name: '阿宗麵線', dishes: '', area: '台北 萬華', address: '', tags: '' };
-  assert.deepEqual(parseFields({ name: ' 阿宗麵線 ', area: '台北 萬華' }), expected);
-  assert.deepEqual(parseFields('{"name":"阿宗麵線","area":"台北 萬華"}'), expected);
-  assert.equal(parseFields('not json'), null);
-  assert.equal(parseFields(undefined), null);
+test('parsePlaces handles several shops, JSON strings, and a bare single object', () => {
+  const shopA = { name: '阿宗麵線', dishes: '', area: '台北 萬華', address: '', tags: '' };
+  const shopB = { name: '林東芳牛肉麵', dishes: '牛肉麵', area: '', address: '', tags: '' };
+  assert.deepEqual(parsePlaces({ places: [{ name: ' 阿宗麵線 ', area: '台北 萬華' }, { name: '林東芳牛肉麵', dishes: '牛肉麵' }] }), [shopA, shopB]);
+  assert.deepEqual(parsePlaces('{"places":[{"name":"阿宗麵線","area":"台北 萬華"}]}'), [shopA]);
+  assert.deepEqual(parsePlaces({ name: '阿宗麵線', area: '台北 萬華' }), [shopA]);
+  assert.deepEqual(parsePlaces({ places: [{ name: '', dishes: '', area: '台北' }, null] }), []);
+  assert.equal(parsePlaces({ places: Array.from({ length: 15 }, (_, i) => ({ name: `店${i}` })) }).length, 10);
+  assert.equal(parsePlaces('not json'), null);
+  assert.equal(parsePlaces(undefined), null);
 });
 
 test('extract returns 503 when the AI binding is missing', async () => {
@@ -39,11 +43,14 @@ test('extract asks for caption when it cannot fetch one', async () => {
   assert.equal((await response.json()).needCaption, true);
 });
 
-test('extract returns AI fields, and 502 when AI fails', async () => {
-  const workingAI = { run: async () => ({ response: { name: '阿宗麵線', dishes: '麵線', area: '台北', address: '', tags: '小吃' } }) };
-  const ok = await onRequestPost({ request: post({ caption: '阿宗麵線' }), env: { AI: workingAI } });
+test('extract returns every shop the AI found, 422 when none, and 502 when AI fails', async () => {
+  const twoShops = { places: [{ name: '阿宗麵線', dishes: '麵線' }, { name: '林東芳牛肉麵', dishes: '牛肉麵' }] };
+  const ok = await onRequestPost({ request: post({ caption: '一次吃兩家' }), env: { AI: { run: async () => ({ response: twoShops }) } } });
   assert.equal(ok.status, 200);
-  assert.equal((await ok.json()).fields.name, '阿宗麵線');
+  assert.deepEqual((await ok.json()).places.map((place) => place.name), ['阿宗麵線', '林東芳牛肉麵']);
+
+  const none = await onRequestPost({ request: post({ caption: '今天天氣好' }), env: { AI: { run: async () => ({ response: { places: [] } }) } } });
+  assert.equal(none.status, 422);
 
   const failingAI = { run: async () => { throw new Error('daily limit'); } };
   const failed = await onRequestPost({ request: post({ caption: '阿宗麵線' }), env: { AI: failingAI } });

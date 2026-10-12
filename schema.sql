@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS places (
   id INTEGER PRIMARY KEY,
-  url TEXT UNIQUE NOT NULL,
+  url TEXT NOT NULL,
   caption TEXT,
   name TEXT,
   dishes TEXT,
@@ -12,3 +12,5 @@ CREATE TABLE IF NOT EXISTS places (
   source TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS places_url ON places (url);

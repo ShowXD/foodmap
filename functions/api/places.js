@@ -54,7 +54,11 @@ export async function onRequestPost({ request, env }) {
   if (error) return json({ error }, 400);
   const source = SOURCES.includes(body.source) ? body.source : 'manual';
 
-  const existing = await env.DB.prepare('SELECT * FROM places WHERE url = ?').bind(url).first();
+  // One video can feature several shops, so a duplicate is the same url *and* the same shop name.
+  const existing = await env.DB
+    .prepare("SELECT * FROM places WHERE url = ? AND COALESCE(name, '') = ?")
+    .bind(url, fields.name ?? '')
+    .first();
   if (existing) return json({ error: 'already saved', place: existing }, 409);
 
   const columns = ['url', 'source', ...Object.keys(fields)];
