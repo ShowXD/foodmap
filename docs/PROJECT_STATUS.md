@@ -124,6 +124,6 @@
 - Access 登入有效期預設 24 小時，文件已說明可調至最長 1 個月與遺失手機時撤銷工作階段
 
 ## 下一步
-1. 使用者（進行中）：Access 已建兩個應用程式且正式網址已被 Access 保護（2026-10-12 驗證 302 → blue-mouse-e3db.cloudflareaccess.com）、Google 登入已連線；待把兩個應用程式原則改為 Include Emails（家人白名單）、登入方法僅 One-time PIN + Google；Google OAuth 保持測試中並加家人為測試使用者；設 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
+1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
 3. 路線圖：Google 地圖、LINE Bot

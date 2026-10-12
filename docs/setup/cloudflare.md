@@ -114,25 +114,42 @@ npm run deploy
 
 ### 5-3 保護正式網址和預覽網址
 
-`*.pages.dev` 不是你帳號裡的網域，要用 Cloudflare 文件寫的繞法（[官方說明](https://developers.cloudflare.com/pages/platform/known-issues/#enable-access-on-your-pagesdev-domain)）：
+網站有兩種網址，**都要保護**：
 
-1. **Workers & Pages** → 你的專案 → **Settings** → 找到 **Enable access policy** 並開啟。這時只會保護預覽網址 `*.<專案>.pages.dev`。
-2. 點 **Manage** → **Configure**，在 **Public hostname** 的 **Subdomain** 把 `*` 刪掉後儲存（若報錯，先幫應用程式改個名字再存）。它就改成保護正式網址 `<專案>.pages.dev`。
-3. 回到 Pages 的 **Settings**，再按一次 **Enable access policy**，重新保護預覽網址。
+- 正式網址 `<專案>.pages.dev`：家人平常用的。
+- 每次部署產生的版本網址 `<編號>.<專案>.pages.dev`：這些也連著同一個正式資料庫，沒保護的話，別人知道網址就能繞過登入。
 
-最後會有兩個 Access 應用程式。兩個的 **Policies** 都設成：
+做法是**一個 Access 應用程式、兩個目的地**。因為 `*.pages.dev` 不是你帳號裡的網域，要先讓 Pages 幫你建立應用程式（[官方說明](https://developers.cloudflare.com/pages/platform/known-issues/#enable-access-on-your-pagesdev-domain)）：
 
-- Action：**Allow**
-- Include：**Emails**，填入每位家人登入用的 email，每個一筆。**不要用 Everyone**，否則任何人都能註冊進來。
-- 登入方式（Login methods）勾選 One-time PIN 和 Google
+1. **Workers & Pages** → 你的專案 → **Settings** → 找到 **Enable access policy** 並開啟。Cloudflare 會建立一個 Access 應用程式，目的地是 `*.<專案>.pages.dev`。
+2. 點 **Manage**，到這個應用程式的 **目的地（Destinations）**，按 **新增公開主機名稱**，加第二筆：子網域**留空**，網域選 `<專案>.pages.dev`。
+   現在它有兩個目的地，同時保護正式網址和所有版本網址。
+3. 名稱改成好認的，例如 `foodmap`。
 
-之後有新家人要用時，把他的 email 加進**這兩個**原則；要移除某人時，從這兩個原則拿掉，再到 App 的「管理」頁停用他的帳號。
+> 之後 Pages 設定頁的「預覽存取」那一列，**不要再按啟用**，否則會多建一個應用程式。
+
+**原則：建一條可重複使用的「家人名單」原則**
+
+**Access 控制** → **原則** → **建立原則**：
+
+- 名稱：`foodmap 家人`
+- 動作：**Allow**
+- 原則工作階段持續時間：例如 1 週或 1 個月（見下方「登入要維持多久」）
+- 包含（Include）：**電子郵件（Emails）**，填入每位家人登入用的 email。**不要用 Everyone**，否則任何人都能註冊進來。
+
+回到應用程式：
+
+- **原則** 分頁：移除自動建立的「Allow Members - Cloudflare Pages」，改選 **foodmap 家人**。
+- **登入方法**：只勾 One-time PIN 和 Google。
+- 存檔後，到 **詳細資訊／其他設定** 抄下 **Application Audience (AUD) Tag**。只有這一個，後面 `ACCESS_AUD` 就填它。
+
+之後有新家人要用時，把他的 email 加進「foodmap 家人」原則（只改這一處）；要移除某人時，從原則拿掉，再到 App 的「管理」頁停用他的帳號。
 
 > 再加一層保險：Google Cloud 的 **OAuth 同意畫面**保持在「**測試中（Testing）**」，只把家人的 Gmail 加進「**測試使用者**」。這樣就算 Access 原則哪天設錯，外人的 Google 帳號也會在 Google 那一關被擋下。
 
-再到兩個應用程式的 **Additional settings**，各抄下 **Application Audience (AUD) Tag**。
+**驗證**：沒登入時連正式網址、某個版本網址，甚至隨便編一個不存在的子網域（例如 `abc.<專案>.pages.dev`），都應該被導到 `<team>.cloudflareaccess.com` 登入頁。
 
-**登入要維持多久（Session Duration）**：預設 24 小時，過期就要重新登入。在兩個應用程式的設定裡把 **工作階段持續時間（Session Duration）** 調長，一般家用設 1 週到 1 個月都合理，最長 1 個月。
+**登入要維持多久（Session Duration）**：預設 24 小時，過期就要重新登入。在「foodmap 家人」原則（或應用程式設定）把 **工作階段持續時間** 調長，一般家用設 1 週到 1 個月都合理，最長 1 個月。
 
 - 期限越長越方便，但手機遺失時，撿到的人在期限內都能打開 App。
 - 遺失時的處理：**Zero Trust** → **團隊與資源** → **使用者** → 找到那個人 → **撤銷工作階段（Revoke session）**，他所有裝置會立刻登出。必要時再到 App 的「管理」頁停用帳號。
@@ -153,7 +170,7 @@ LINE 伺服器沒辦法登入，所以 `/api/line/webhook` 要另開一個應用
 
 ```bash
 npx wrangler pages secret put ACCESS_TEAM_DOMAIN   # 例如 xxxx.cloudflareaccess.com
-npx wrangler pages secret put ACCESS_AUD           # 兩個 AUD Tag 用逗號隔開：正式,預覽
+npx wrangler pages secret put ACCESS_AUD           # 應用程式的 AUD Tag（若有多個應用程式，用逗號隔開）
 npx wrangler pages secret put ADMIN_EMAILS         # 管理員的 email，多個用逗號隔開
 npm run deploy
 ```
