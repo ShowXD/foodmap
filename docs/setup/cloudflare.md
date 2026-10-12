@@ -10,6 +10,19 @@
 
 ---
 
+## 0. 安裝專案內的 wrangler
+
+wrangler 已列在 `package.json` 的 `devDependencies`，版本鎖在 `package-lock.json`，只裝在這個專案的 `node_modules/`，不會影響其他專案：
+
+```bash
+npm install
+```
+
+之後文件裡的 `npx wrangler ...` 都會用專案內這一份。
+
+> **不要寫成 `npx wrangler@4`。** 指定版本的寫法會另外從 npm 下載一份，不是用專案裡鎖定的版本。
+> 另外要注意：`wrangler login` 的登入狀態存在使用者層級，所有專案共用同一個 Cloudflare 帳號。
+
 ## 1. 建立帳號並登入 wrangler
 
 1. 到 <https://dash.cloudflare.com/sign-up> 註冊（免費方案就夠）。
@@ -21,15 +34,19 @@
 
 ## 2. 建立 D1 資料庫
 
+下面是**兩個獨立的指令**，請依序分開執行：
+
+**2-1 建立資料庫**（`--location apac` 讓資料庫放在亞太區，台灣連線比較快）：
+
 ```bash
-npx wrangler d1 create foodmap
+npx wrangler d1 create foodmap --location apac
 ```
 
 輸出會有一行 `database_id = "xxxxxxxx-..."`。把它貼到 [`wrangler.toml`](../../wrangler.toml)，取代 `REPLACE_WITH_D1_DATABASE_ID`。
 
 > 這個 ID 不是密碼，但也沒必要公開。要不要 commit 隨你；不想公開的話，就只留在本機、不要 commit 這一行。
 
-套用資料表結構到雲端資料庫（記得加 `--remote`，不加會只套到本機）：
+**2-2 套用資料表結構到雲端資料庫**（記得加 `--remote`，不加會只套到本機）：
 
 ```bash
 npx wrangler d1 execute foodmap --remote --file=./schema.sql
@@ -38,12 +55,11 @@ npx wrangler d1 execute foodmap --remote --file=./schema.sql
 ## 3. 建立 Pages 專案並第一次部署
 
 ```bash
-npm install
 npx wrangler pages project create foodmap
-npx wrangler pages deploy
+npm run deploy
 ```
 
-- `pages deploy` 會依 `wrangler.toml` 的 `pages_build_output_dir` 上傳 `public/`，連同 `functions/` 一起部署。
+- `npm run deploy` 就是 `wrangler pages deploy`，會依 `wrangler.toml` 的 `pages_build_output_dir` 上傳 `public/`，連同 `functions/` 一起部署。
 - 部署完會得到網址 `https://foodmap.pages.dev`。如果名字被用掉了，會是你自己取的專案名稱。
 
 ## 4. 確認 D1 與 Workers AI 綁定
@@ -75,7 +91,7 @@ npx wrangler pages secret put LINE_CHANNEL_SECRET    # 取得方式見 line.md
 指令會要你貼上值，輸入時不會顯示在畫面上。設定完再部署一次比較保險：`npx wrangler pages deploy`。
 
 > 本機開發要用金鑰時，放在 repo 根目錄的 `.dev.vars`（`.gitignore` 已排除），格式是 `LINE_CHANNEL_SECRET=...`，一行一個。
-> **本機開發（`npx wrangler pages dev`）必須先 `npx wrangler login`。** `wrangler.toml` 裡的 AI 綁定一定要連到 Cloudflare，沒登入時 dev server 會直接啟動失敗，連清單功能都不能用。本機測試 AI 的用量也算在同一份免費額度裡。
+> **本機開發（`npm run dev`）必須先 `npx wrangler login`。** `wrangler.toml` 裡的 AI 綁定一定要連到 Cloudflare，沒登入時 dev server 會直接啟動失敗，連清單功能都不能用。本機測試 AI 的用量也算在同一份免費額度裡。
 
 ## 6. 用 Cloudflare Access 限制只有家人能登入
 
