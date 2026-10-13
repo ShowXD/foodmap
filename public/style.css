@@ -78,6 +78,9 @@ body[data-view="list"] .view[data-view="list"],
 body[data-view="add"] .view[data-view="add"],
 body[data-view="random"] .view[data-view="random"],
 body[data-view="me"] .view[data-view="me"] { display: block; }
+/* The map stays laid out (just invisible) on other tabs, so coming back shows it at once instead of
+   redrawing from zero size. Switching tabs never creates a new map, so it isn't billed again either way. */
+body:not([data-view="map"]) .view[data-view="map"] { display: block; position: fixed; inset: 0; visibility: hidden; }
 .view-title { font-size: 1.15rem; margin: 0 0 12px; }
 
 /* Switching tabs: the page slides while the top bar and tab bar stay put (View Transitions API). */
