@@ -147,6 +147,21 @@ npm run deploy
 
 > 再加一層保險：Google Cloud 的 **OAuth 同意畫面**保持在「**測試中（Testing）**」，只把家人的 Gmail 加進「**測試使用者**」。這樣就算 Access 原則哪天設錯，外人的 Google 帳號也會在 Google 那一關被擋下。
 
+**開放給朋友：任何 Google 帳號都能登入（2026-10-13 起採用）**
+
+朋友不用你一個個加 email，只要有 Google 帳號就能登入。每個人自動有自己的私人「我的清單」，可以自己建群組、邀朋友；費用算在你的帳上，所以 App 有每人每日上限（地圖 30 次、地點搜尋 20 次、AI 擷取 30 次，在網站管理「API 用量」看得到誰用了多少）。
+
+1. **Access 控制** → **原則** → 編輯 `foodmap 家人`：
+   - 在包含（Include）**新增一條**：**登入方法（Login Methods）** = **Google**。
+   - 原本的「電子郵件」那條保留：用 Email 驗證碼登入的家人照常能進。Include 之間是「或」，符合任一條即可。
+2. Google Cloud → **API 和服務** → **OAuth 同意畫面**（或 Google Auth Platform → 目標對象）：把發布狀態從「**測試中**」改成「**正式版（In production）**」。只用 email、名稱這類基本資料，不需要 Google 審核；不改的話，不在「測試使用者」名單裡的 Google 帳號會在 Google 那一關被擋下。
+3. 注意事項：
+   - Cloudflare Zero Trust 免費方案最多 **50 位使用者**，超過要付費或移除不用的帳號（Zero Trust → 我的團隊 → 使用者）。
+   - 拿到網址的陌生人也能登入；若發現不認識的帳號，到 App「我的 → 帳號管理」停用。
+   - 想回到只限家人：刪掉「登入方法 = Google」那條，OAuth 同意畫面改回測試中。
+
+**LINE 官方帳號 ID（選填）**：朋友綁 LINE 群組時，App 可以直接顯示「加好友」連結。到 LINE Official Account Manager 找到帳號的 Basic ID（像 `@123abcde`），存成 secret：`npx wrangler pages secret put LINE_BOT_ID`。
+
 **驗證**：沒登入時連正式網址、某個版本網址，甚至隨便編一個不存在的子網域（例如 `abc.<專案>.pages.dev`），都應該被導到 `<team>.cloudflareaccess.com` 登入頁。
 
 **登入要維持多久（Session Duration）**：預設 24 小時，過期就要重新登入。在「foodmap 家人」原則（或應用程式設定）把 **工作階段持續時間** 調長，一般家用設 1 週到 1 個月都合理，最長 1 個月。
@@ -271,6 +286,7 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0009_api_usage.sql` | 各 API 每日呼叫次數（網站管理頁的用量圖表） | 還沒有 `api_usage` 表的資料庫 |
 | `0010_thumbnails.sql` | 影片縮圖（存 IG/FB 的預覽圖） | 還沒有 `place_thumbnails` 表的資料庫 |
 | `0011_profile.sql` | 個人名稱與大頭貼 | `users` 還沒有 `display_name` 欄位的資料庫 |
+| `0012_friends.sql` | 每人每日用量上限、LINE 群組綁定碼 | 還沒有 `user_daily_usage` 表的資料庫 |
 
 > 若 `--file` 出現 `Authentication error [code: 10000]`（匯入 API 的權限問題），改用 `--command "<SQL>"` 直接執行；各 migration 檔開頭有單行版本或內容很短可直接貼上。
 

@@ -181,7 +181,9 @@
 - 狀態列顏色：`theme-color` 改為依深淺色模式與 App 背景同色（原本橘色）；manifest `theme_color` 同步
 - 驗證：Chrome 390×844：五顆按鈕中心 39/117/195/273/351（左右對稱）、隨機頁距離與標籤篩選、在地圖上看開卡片
 
-## 開放給朋友使用（2026-10-13 使用者核准計畫，進行中）
+## 開放給朋友使用（2026-10-13 使用者核准計畫；程式已完成並本機驗證，尚未部署）
+- **4. 文件與隱私權頁 ✅**：`docs/setup/cloudflare.md` 新增「開放給朋友」：Access 原則加 Include「登入方法 = Google」（保留 email 那條給驗證碼登入的家人）、**OAuth 同意畫面要從「測試中」改「正式版」**（否則非測試使用者的 Google 帳號會被擋）、Zero Trust 免費 50 人上限、陌生人可在帳號管理停用；選填 secret `LINE_BOT_ID`（加好友連結）；migration 表加 0012。新增 `public/privacy.html`（`/privacy`，「我的」頁有連結）：存了什麼、誰看得到、第三方服務（含 Google 地圖條款連結、座標 30 天規定）、刪除方式
+- **上線待辦（使用者）**：remote 跑 0012（兩個 CREATE TABLE，用 `--command`）→ `npm run deploy` → Access 原則加 Google → OAuth 同意畫面改正式版 →（選填）`LINE_BOT_ID` → 請一位朋友實測登入、建群組、綁 LINE 群組
 - 決定：共用同一網站（費用在使用者帳上，靠每人每日上限）、任何 Google 帳號可登入、網站管理員維持看得到所有群組、朋友 LINE 群組由群組擁有者用綁定碼自己綁。三個分支：open-groups → per-user-limits → line-bind-code，最後改文件與 Access 原則說明、加隱私權頁
 - **3. 群組擁有者自己綁 LINE 群組 ✅（已本機驗證；未在真實 LINE 群組實測）**：`POST /api/line-bind-code {list_id}`（只限擁有者／管理員，6 碼不含 0/O/1/I，30 分鐘有效、同清單產生新碼會作廢舊碼；有設 `LINE_BOT_ID` 時回傳加好友連結 `https://line.me/R/ti/p/<ID>`）；webhook 收到「綁定 XXXXXX」（大小寫、中間空白皆可）→ 有效碼且該 LINE 群組**尚未綁定**才綁，成功後刪碼（已綁到別的清單不會被搶）；`/api/line-groups?list=ID` 擁有者只看綁到自己群組的、只能解除（`list_id: null`），完整清單仍限管理員。前端：群組成員頁（擁有者）新增「💬 LINE 群組」區：已連結的群組＋解除、產生綁定碼＋三步驟說明、重新整理。驗證：`npm test` 63/63（新 `test/line-bind.test.mjs` 4 項）；本機擁有者頁面顯示已綁群組與綁定碼
 - **2. 每人每日上限＋看得到誰用的 ✅（已本機驗證）**：`migrations/0012_friends.sql`（`user_daily_usage`，以及第 3 步要用的 `line_bind_codes`）；`lib/usage.js` `APIS.perUserDaily`（地圖載入 30、地點搜尋 20、AI 擷取 30、座標更新不限）與 `takeUserQuota`（到上限時不再累加，`ON CONFLICT … DO UPDATE … WHERE count < 上限`）；`/api/config` 超過上限不給金鑰（前端顯示「今天開地圖的次數已用完」）、`/api/place-search` 超過回 429、`/api/extract` 改用 `takeUserQuota`（`extract_usage` 表不再寫入）；LINE 每個清單每天最多 20 次 AI（全站 50 次保留，`canUseLineAi`）；`/api/usage` 多回 `per_user_daily`、`top_users`，管理頁每張卡片顯示「每人每天最多 N 次。今天：某某 12、…」。驗證：`npm test` 59/59（usage 2 項、line 1 項）；本機管理頁顯示今日使用者
