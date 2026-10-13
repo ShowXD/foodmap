@@ -44,8 +44,11 @@
 
 **Authentication** → **Database** → **Username-Password-Authentication**：
 
-- **Disable Sign Ups** 保持**關閉**（朋友要能自己註冊）。
-- **Password Policy**：選 **Good** 以上。
+- **Settings** 分頁：**Disable Sign Ups** 保持**關閉**（朋友要能自己註冊）。
+- **Authentication Methods** 分頁 → **Password** → **Configure**：**Password Policy** 選 **Good** 以上。（Passkey 可先不開。）
+- **Applications** 分頁：確認第 2 步建立的應用程式是開啟的。
+
+> 註冊後頁面上方會出現付費功能的試用橫幅，到期自動回到免費方案，**不用填信用卡**；這裡用到的功能（含第 4 步的 Actions）都在免費方案內。
 
 **Security** → **Attack Protection**：確認 **Brute-force Protection** 是開啟的（預設開）。
 
