@@ -94,8 +94,15 @@
     </section>
 
     <section class="view" data-view="me" aria-label="我的">
-      <h2 class="view-title">我的</h2>
-      <p class="meta">登入帳號：<span id="user-email"></span></p>
+      <div class="profile">
+        <button id="avatar-button" type="button" class="avatar avatar-large" aria-label="更換大頭貼"></button>
+        <div class="profile-text">
+          <h2 id="profile-name" class="profile-name"></h2>
+          <p id="user-email" class="meta"></p>
+        </div>
+        <button id="edit-profile" type="button" class="secondary edit-profile">編輯</button>
+      </div>
+      <input id="avatar-file" type="file" accept="image/*" aria-label="選擇大頭貼照片" hidden>
       <label>目前清單 <select id="list-select" aria-label="切換清單"></select></label>
       <nav class="menu">
         <a id="members-link" href="/members" hidden>👥 群組成員</a>
@@ -117,7 +124,7 @@
     <a href="#list" data-tab="list"><span aria-hidden="true">📋</span>清單</a>
     <a href="#add" data-tab="add" class="tab-add" aria-label="新增店家"><span aria-hidden="true">＋</span></a>
     <a href="#random" data-tab="random"><span aria-hidden="true">🎲</span>吃什麼</a>
-    <a href="#me" data-tab="me"><span aria-hidden="true">👤</span>我的</a>
+    <a href="#me" data-tab="me"><span id="tab-avatar" class="avatar tab-avatar" aria-hidden="true"></span><span id="tab-name" class="tab-name">我的</span></a>
   </nav>
 
   <dialog id="visit-dialog">
@@ -137,6 +144,21 @@
         <button value="save">儲存</button>
         <button value="remove" class="secondary" id="visit-remove">取消吃過</button>
         <button value="cancel" class="secondary" formnovalidate>關閉</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="profile-dialog">
+    <form method="dialog" id="profile-form">
+      <h2>編輯個人資料</h2>
+      <label>名稱（家人看到的名字） <input name="display_name" maxlength="30"></label>
+      <div class="actions">
+        <button id="change-avatar" type="button" class="secondary">換大頭貼</button>
+        <button id="remove-avatar" type="button" class="secondary">移除大頭貼</button>
+      </div>
+      <div class="actions">
+        <button value="save">儲存</button>
+        <button value="cancel" class="secondary" formnovalidate>取消</button>
       </div>
     </form>
   </dialog>

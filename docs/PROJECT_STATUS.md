@@ -181,6 +181,13 @@
 - 狀態列顏色：`theme-color` 改為依深淺色模式與 App 背景同色（原本橘色）；manifest `theme_color` 同步
 - 驗證：Chrome 390×844：五顆按鈕中心 39/117/195/273/351（左右對稱）、隨機頁距離與標籤篩選、在地圖上看開卡片
 
+## 個人名稱與大頭貼（2026-10-13，已本機驗證）
+- `migrations/0011_profile.sql`＋`schema.sql`：`users.display_name`；`user_avatars(user_id, content_type, image BLOB, updated_at)` 另開一表（middleware 每次請求都 `SELECT * FROM users`，不要帶圖片）
+- `GET /api/me` 多回 `id`、`name`、`avatarVersion`；`PATCH /api/me {display_name}`（≤30 字，空白＝回預設 email @ 前面）；`PUT /api/avatar`（原始圖片 body，只收 JPEG/PNG/WebP 且檢查檔頭、≤300 KB）、`DELETE /api/avatar`；`GET /avatar/:userId`（登入的家人都能看，`?v=updated_at` 換網址所以可長快取）；`/api/visits` GET 多回 `name`（家人評價顯示名稱）
+- 前端：「我的」頁頂部大頭貼＋名稱＋email＋編輯（dialog：改名、換／移除大頭貼）；點大頭貼直接換照片；瀏覽器端裁成置中正方形、縮成 256px JPEG 再上傳；導覽列「我的」改成小頭像＋名稱；沒照片時顯示名稱第一個字＋每人固定顏色
+- 名稱自動帶入：沒設名稱時讀同網域 `/cdn-cgi/access/get-identity` 的 `name`（Google 登入通常有，Email 驗證碼登入沒有）——**未在正式環境驗證** Access 是否回傳 name；Google 大頭貼 Access 不提供，所以改為自行上傳
+- 驗證：`npm test` 54/54（新 `test/profile.test.mjs` 3 項：名稱設定／重設／長度、上傳型別與檔頭與大小檢查、取回與刪除、評價帶名稱）；Chrome 390×844：首字頭像、改名（去空白）同步到導覽列、上傳 400×300 圖 → 256×256 JPEG 置中裁切、移除後回到首字
+
 ## 清單兩種排列＋影片縮圖＋底部卡片（2026-10-13，已本機驗證）
 - 清單頁搜尋框旁切換「☰ 列表」（一列一家：縮圖 56px、店名、距離·食物·地區、新／★／✓評分）與「▦ 縮圖」（兩欄方塊，寬螢幕三欄）；選擇記在 localStorage `foodmap.layout`
 - 點任一家 → 底部滑出完整卡片（`#map-card` 移到 body 層，各頁共用；卡片頂部有 180px 縮圖、✕ 有深色底以免被圖蓋住）；換頁時自動關閉（在 `showView` 同步判斷，用 `currentView` 變數而非 `body.dataset.view`，因為動畫版切換會晚一步更新 dataset，造成「在地圖上看」剛打開的卡片被關掉——本機驗證時發現並修正）
@@ -203,5 +210,5 @@
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
 3. 使用者照 `docs/setup/line.md` 申請 LINE、設 `LINE_CHANNEL_SECRET`、跑 0006、部署、建 webhook Bypass app、設 Webhook URL、拉 Bot 進群組並在管理頁綁定「家人」，實測擷取品質
 4. 待決：登入是否加密碼方式（使用者保留選擇：A 外接 Auth0 類服務經 Access OIDC／B 自建／C 維持 OTP + Google）
-5. 上線：remote 依序跑 `migrations/0007_personal.sql`（若尚未）、`0008_location.sql`、`0009_api_usage.sql` → `npm run deploy` → 使用者手機實測地圖、定位、拖曳、Google 搜尋候選
+5. 上線：remote 已有 0007、0008（2026-10-13 查證）；0009 用 `--file` 時遇 `Authentication error [code: 10000]`（匯入 API），已請使用者改用 `--command`；還需 0010、0011（以 `--command` 執行）→ `npm run deploy` → 使用者手機實測地圖、定位、拖曳、Google 搜尋候選、縮圖（真實 IG/FB 是否有 og:image）、Access 是否回傳 name
 6. 階段 C：營業時間／Google 評分（開卡片即時查、每日上限、標示 Google）、使用條款／隱私權頁、影片縮圖（R2，需改 `wrangler.toml`）

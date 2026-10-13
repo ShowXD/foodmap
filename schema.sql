@@ -3,7 +3,16 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('pending', 'approved', 'disabled')),
   is_admin INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1)),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  display_name TEXT
+);
+
+-- Profile photos, kept out of users because the middleware loads that row on every request.
+CREATE TABLE IF NOT EXISTS user_avatars (
+  user_id INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  content_type TEXT NOT NULL,
+  image BLOB NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- A list is either someone's private list (is_personal = 1, owner_user_id set)

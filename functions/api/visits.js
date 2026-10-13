@@ -10,7 +10,7 @@ export async function onRequestGet({ request, env, data }) {
   if (!place) return notFound();
   const { results } = await env.DB
     .prepare(
-      `SELECT u.email, v.visited_at, v.rating, v.note, v.user_id = ?2 AS is_mine
+      `SELECT u.email, u.display_name AS name, v.visited_at, v.rating, v.note, v.user_id = ?2 AS is_mine
        FROM place_visits v JOIN users u ON u.id = v.user_id WHERE v.place_id = ?1 ORDER BY v.visited_at DESC`,
     )
     .bind(place.id, data.user.id)

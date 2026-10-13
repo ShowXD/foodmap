@@ -237,7 +237,7 @@ async function openVisitDialog(place) {
     const visits = await api('GET', null, `?place=${place.id}`, '/api/visits');
     others.replaceChildren(...visits.filter((v) => !v.is_mine).map((v) => {
       const item = document.createElement('li');
-      item.textContent = `${v.email.split('@')[0]}：${v.rating ? `${v.rating} 分` : '吃過'}${v.note ? `，${v.note}` : ''}`;
+      item.textContent = `${v.name || v.email.split('@')[0]}：${v.rating ? `${v.rating} 分` : '吃過'}${v.note ? `，${v.note}` : ''}`;
       return item;
     }));
   } catch (error) {
@@ -886,10 +886,124 @@ listSelect.addEventListener('change', () => {
   loadPlaces({ markRead: true });
 });
 
+// ---- Profile: name and photo shown on 我的 and on the tab ----
+const profileDialog = $('profile-dialog');
+const profileForm = $('profile-form');
+const MAX_NAME_LENGTH = 30;
+const AVATAR_SIZE = 256;
+let profile = null;
+
+const displayName = (person) => person.name || person.email.split('@')[0];
+
+function renderAvatar(element, person) {
+  // A steady colour per person, so initials are easy to tell apart.
+  element.style.setProperty('--avatar-hue', String((person.id * 47) % 360));
+  if (person.avatarVersion) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.src = `/avatar/${person.id}?v=${encodeURIComponent(person.avatarVersion)}`;
+    element.replaceChildren(image);
+  } else {
+    element.textContent = Array.from(displayName(person))[0].toUpperCase();
+  }
+}
+
+function applyProfile() {
+  $('profile-name').textContent = displayName(profile);
+  $('user-email').textContent = profile.email;
+  $('tab-name').textContent = displayName(profile);
+  $('admin-link').hidden = !profile.isAdmin;
+  renderAvatar($('avatar-button'), profile);
+  renderAvatar($('tab-avatar'), profile);
+}
+
+// Google sign-ins usually carry the person's name; email-code sign-ins don't, so this may find nothing.
+async function nameFromSignIn() {
+  try {
+    const response = await fetch('/cdn-cgi/access/get-identity');
+    if (!response.ok) return null;
+    const identity = await response.json();
+    return typeof identity.name === 'string' && identity.name.trim() ? identity.name.trim().slice(0, MAX_NAME_LENGTH) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveName(name) {
+  ({ name: profile.name } = await api('PATCH', { display_name: name }, '', '/api/me'));
+  applyProfile();
+}
+
+// Square-crops and shrinks to a small JPEG in the browser, so uploads stay tiny whatever the phone camera produced.
+async function squareJpeg(file) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = AVATAR_SIZE;
+  canvas.height = AVATAR_SIZE;
+  const scale = Math.max(AVATAR_SIZE / bitmap.width, AVATAR_SIZE / bitmap.height);
+  const width = bitmap.width * scale;
+  const height = bitmap.height * scale;
+  canvas.getContext('2d').drawImage(bitmap, (AVATAR_SIZE - width) / 2, (AVATAR_SIZE - height) / 2, width, height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('無法處理這張圖片'))), 'image/jpeg', 0.85);
+  });
+}
+
+$('avatar-file').addEventListener('change', async () => {
+  const file = $('avatar-file').files[0];
+  $('avatar-file').value = '';
+  if (!file) return;
+  try {
+    const response = await fetch('/api/avatar', { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: await squareJpeg(file) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    profile.avatarVersion = payload.avatarVersion;
+    applyProfile();
+  } catch (error) {
+    alert(`更換大頭貼失敗：${error.message}`);
+  }
+});
+
+const pickAvatar = () => $('avatar-file').click();
+$('avatar-button').addEventListener('click', pickAvatar);
+$('change-avatar').addEventListener('click', () => {
+  profileDialog.close('cancel');
+  pickAvatar();
+});
+
+$('remove-avatar').addEventListener('click', async () => {
+  try {
+    ({ avatarVersion: profile.avatarVersion } = await api('DELETE', null, '', '/api/avatar'));
+    applyProfile();
+    $('remove-avatar').hidden = true;
+  } catch (error) {
+    alert(`移除失敗：${error.message}`);
+  }
+});
+
+$('edit-profile').addEventListener('click', () => {
+  profileForm.elements.display_name.value = displayName(profile);
+  $('remove-avatar').hidden = !profile.avatarVersion;
+  profileDialog.showModal();
+});
+
+profileDialog.addEventListener('close', async () => {
+  if (profileDialog.returnValue !== 'save') return;
+  try {
+    await saveName(profileForm.elements.display_name.value);
+  } catch (error) {
+    alert(`儲存失敗：${error.message}`);
+  }
+});
+
 api('GET', null, '', '/api/me')
-  .then((me) => {
-    $('user-email').textContent = me.email;
-    $('admin-link').hidden = !me.isAdmin;
+  .then(async (me) => {
+    profile = me;
+    applyProfile();
+    if (!profile.name) {
+      const name = await nameFromSignIn();
+      if (name) await saveName(name);
+    }
   })
   .catch((error) => console.error('Failed to load current user', error));
 
