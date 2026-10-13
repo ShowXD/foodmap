@@ -149,7 +149,10 @@
 - 階段 A（不需 Google，進行中，分支 `feature/v2-nav-personal`）：導覽列骨架；每人各自「吃過」＋評分心得（`place_visits`）；想吃星號（`place_stars`）；最近新增「新」（`list_reads`）；待整理區（沒店名／之後沒座標）；篩選 chips（未吃／吃過／★／標籤）；分享單一店家（Web Share）；匯出 CSV；`migrations/0007_personal.sql`
 - 階段 B（需使用者建 Google Cloud 專案與金鑰）：Google 地圖、我的位置、標點卡片、附近＋距離、今天吃什麼、拖曳修正位置；Places Text Search 取座標；CSP 加 Google 網域；Maps 金鑰由 `/api/config` 提供、Places 金鑰為 secret
 - 階段 C：營業時間／Google 評分（Place Details，7 天快取）、影片縮圖（og:image 存 R2）
-- 待查證：Places/Maps 各 SKU 免費額度、Google CSP 網域、R2 綁定、只貼連結時的抓取成功率（待使用者給真實連結）
+- 已查證（2026-10-13，詳見 `docs/setup/google.md`）：Dynamic Maps 10k/月免費；Text Search（id/displayName/formattedAddress/location）= Text Search Pro 5k/月；Place Details 只要 location = Essentials 10k/月；opening hours/rating = Place Details Enterprise **1k/月**。**條款：place ID 可永久存、lat/lng 最多快取 30 天（Service Terms 14.3）、其他 Places 內容不可存**；Places 資料須顯示於 Google 地圖或附 Google 標示；需有使用條款／隱私權頁。CSP 官方 allowlist：script-src 加 `'unsafe-eval' https://*.googleapis.com https://*.gstatic.com *.google.com https://*.ggpht.com *.googleusercontent.com blob:`、img-src/connect-src 加 googleapis/gstatic/google.com、`frame-src *.google.com`、`font-src https://fonts.gstatic.com`、`worker-src blob:`（官方範例含 script `'unsafe-inline'`，本專案無內嵌 script，實作時驗證可否省略）
+- **設計調整（因條款）**：存 `google_place_id`（永久）＋ `lat/lng/location_fetched_at`（>25 天在背景用 Place Details Essentials 重抓）；手動拖曳位置 `location_source='manual'` 永久保存；營業時間／評分不存，開卡片時即時查詢並設每日上限；Google 的店名／地址不覆寫使用者／AI 內容；Advanced Markers 需 Map ID
+- secret：`GOOGLE_MAPS_BROWSER_KEY`、`GOOGLE_MAPS_MAP_ID`（經 `/api/config` 給已登入前端）、`GOOGLE_PLACES_KEY`（只在伺服器）
+- 待查證：R2 綁定（階段 C 縮圖）、只貼連結時的抓取成功率（待使用者給真實連結）
 - 完整計畫：見 Claude 計畫檔（摘要即本節）
 - **階段 A ✅（2026-10-13 完成並本機驗證）**
   - 後端：`schema.sql` 加 `place_visits`/`place_stars`/`list_reads`、`migrations/0007_personal.sql`（舊 `status='visited'` 且有 `created_by` 轉入 visits）、`lib/lists.js` 加 `findAccessiblePlace`、新 API `functions/api/visits.js`（GET ?place= 全家評價／PUT 吃過＋評分心得／DELETE）、`stars.js`、`list-read.js`、`export.js`（CSV，BOM，防公式注入）；`places.js` GET 帶回 `my_visited_at/my_rating/my_note/visit_count/avg_rating/starred/is_new`（「新」＝別人在我上次開清單後新增）
