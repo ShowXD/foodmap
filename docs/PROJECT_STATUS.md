@@ -137,6 +137,13 @@
 - 未驗證：pages.dev 上 webhook 路徑的 Access Bypass app、LINE Verify、正式環境 AI 對群組貼文的擷取品質
 - 設定步驟見 `docs/setup/line.md`
 
+## Service Worker 不再快取（2026-10-13）
+- 問題：使用者手機上仍出現已移除的家庭密碼登入頁且無法登入。原因推斷：家庭密碼時期 SW 安裝時 `cache.addAll(['/', …])` 被轉址到 `/login`，把登入頁存成 `/`；改用 Access 後，未登入的導覽被轉到 cloudflareaccess.com，手機（尤其 iOS 主畫面 App）上 fetch 失敗時 SW 用快取回應 → 顯示舊登入頁；且舊 SW 要登入成功後才能更新
+- 修正（f0f7fad）：`public/sw.js` 只保留可安裝 PWA，不快取、無 fetch handler，啟用時刪除所有快取
+- 驗證：Chrome 全新環境先放入模擬舊快取 `foodmap-shell-v1`，載入首頁後新 SW 啟用並清空快取、頁面正常
+- 已受影響的手機需手動清除網站資料或移除主畫面 App 後重新安裝（新 SW 要等能載入網站後才會接手）
+- LINE：使用者已完成 webhook Bypass app，LINE Verify 回 Success（先前 401 為 Cloudflare 與 LINE 的 channel secret 不一致，重設並重新部署後解決）
+
 ## 下一步
 1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
