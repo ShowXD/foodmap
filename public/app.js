@@ -72,7 +72,7 @@ let hasShownView = false; // the first render (e.g. opening straight into #add f
 
 // Pages opened from 我的 keep that tab highlighted.
 const ADMIN_VIEWS = ['usage', 'groups', 'line-groups', 'accounts'];
-const PARENT_TAB = Object.fromEntries(['members', ...ADMIN_VIEWS].map((view) => [view, 'me']));
+const PARENT_TAB = { members: 'list', ...Object.fromEntries(ADMIN_VIEWS.map((view) => [view, 'me'])) };
 
 function showView() {
   // Hashes look like "#list" or "#members?list=3".

@@ -37,6 +37,11 @@
     </section>
 
     <section class="view" data-view="list" aria-label="清單">
+      <div class="list-picker">
+        <select id="list-select" aria-label="切換清單"></select>
+        <a id="members-link" class="icon-button" href="#members" aria-label="群組成員" title="群組成員" hidden>👥</a>
+        <a id="export-link" class="icon-button" href="/api/export" download aria-label="匯出這份清單（CSV）" title="匯出 CSV">⬇️</a>
+      </div>
       <div class="list-tools">
         <input id="search" type="search" placeholder="搜尋店名、食物、地區、標籤…" aria-label="搜尋">
         <div class="layout-toggle" role="group" aria-label="排列方式">
@@ -103,10 +108,7 @@
         <button id="edit-profile" type="button" class="secondary edit-profile">編輯</button>
       </div>
       <input id="avatar-file" type="file" accept="image/*" aria-label="選擇大頭貼照片" hidden>
-      <label>目前清單 <select id="list-select" aria-label="切換清單"></select></label>
       <nav class="menu">
-        <a id="members-link" href="#members" hidden>👥 群組成員</a>
-        <a id="export-link" href="/api/export" download>⬇️ 匯出這份清單（CSV）</a>
         <a class="admin-only" href="#usage" hidden>📊 API 用量</a>
         <a class="admin-only" href="#groups" hidden>🏠 群組管理</a>
         <a class="admin-only" href="#line-groups" hidden>💬 LINE 群組</a>
@@ -115,7 +117,7 @@
       </nav>
     </section>
     <section class="view" data-view="members" aria-label="群組成員">
-      <a class="back-link" href="#me">← 我的</a>
+      <a class="back-link" href="#list">← 清單</a>
       <h2 id="group-title" class="view-title">群組成員</h2>
       <form id="add-member-form" class="inline-form" hidden>
         <input name="email" type="email" required placeholder="輸入對方登入用的 email" aria-label="成員 email">

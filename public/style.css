@@ -323,7 +323,19 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 .profile-text .meta { margin: 0; overflow-wrap: anywhere; }
 .edit-profile { width: auto; padding: 8px 14px; }
 #profile-form { display: grid; gap: 12px; }
-.view[data-view="me"] label { margin: 12px 0; }
+.list-picker { display: flex; gap: 8px; margin-bottom: 10px; }
+.list-picker select { flex: 1; min-width: 0; font-weight: 600; }
+.icon-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  text-decoration: none;
+  font-size: 1.1rem;
+}
 .menu { display: grid; gap: 8px; margin-top: 12px; }
 .menu a {
   display: block;
