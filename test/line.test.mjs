@@ -127,6 +127,6 @@ test('only site admins bind LINE groups, and only to group lists', async () => {
   assert.equal(await patch(admin, { group_id: GROUP, list_id: 2 }), 400);
   assert.equal(await patch(admin, { group_id: GROUP, list_id: 1 }), 200);
   assert.equal(await patch(admin, { group_id: 'Cunknown', list_id: 1 }), 404);
-  const listed = await (await lineGroups.onRequestGet({ env: { DB }, data: { user: admin } })).json();
+  const listed = await (await lineGroups.onRequestGet({ request: new Request('https://example.test/api/line-groups'), env: { DB }, data: { user: admin } })).json();
   assert.deepEqual(listed.map((g) => [g.group_id, g.list_name]), [[GROUP, '家人']]);
 });

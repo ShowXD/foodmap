@@ -329,6 +329,9 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 #group-form { display: grid; gap: 12px; }
 #group-form p { margin: 0; }
 .leave-group { margin-top: 16px; }
+.bind-instructions { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.bind-instructions strong { color: var(--accent); font-size: 1.15rem; user-select: all; }
+.bind-instructions a { color: var(--accent); }
 .icon-button {
   display: grid;
   place-items: center;

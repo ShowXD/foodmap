@@ -84,9 +84,35 @@ async function locateAutomatically(env, placeId, place) {
   }
 }
 
+const BIND_COMMAND = /^綁定\s*([A-Za-z0-9]{6})$/;
+
+// A group owner's one-time code (line-bind-code.js) binds this LINE group to their list. It never takes
+// over a LINE group that already feeds a list; that one has to be unbound first by its owner or a site admin.
+async function bindWithCode(db, groupId, code) {
+  const valid = await db
+    .prepare('SELECT list_id FROM line_bind_codes WHERE code = ? AND expires_at > CURRENT_TIMESTAMP')
+    .bind(code)
+    .first();
+  if (!valid) return;
+  const bound = await db
+    .prepare(
+      `INSERT INTO line_groups (group_id, list_id, last_message_at) VALUES (?1, ?2, CURRENT_TIMESTAMP)
+       ON CONFLICT (group_id) DO UPDATE SET list_id = ?2, last_message_at = CURRENT_TIMESTAMP WHERE line_groups.list_id IS NULL
+       RETURNING list_id`,
+    )
+    .bind(groupId, valid.list_id)
+    .first();
+  if (bound) await db.prepare('DELETE FROM line_bind_codes WHERE code = ?').bind(code).run();
+}
+
 async function collectLinks(env, event) {
   const groupId = event.source?.groupId ?? event.source?.roomId;
   if (!groupId) return; // 1:1 chats with the bot are ignored.
+  const bindCommand = BIND_COMMAND.exec(String(event.message.text ?? '').trim());
+  if (bindCommand) {
+    await bindWithCode(env.DB, groupId, bindCommand[1].toUpperCase());
+    return;
+  }
   const listId = await boundListId(env.DB, groupId);
   if (!listId) return;
 

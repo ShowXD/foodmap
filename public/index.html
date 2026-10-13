@@ -127,6 +127,20 @@
       </form>
       <p id="members-message" role="status">載入中…</p>
       <ul id="member-list" class="user-list"></ul>
+      <section id="line-bind" class="line-bind" hidden>
+        <h2 class="section-title">💬 LINE 群組</h2>
+        <p class="meta">連結後，LINE 群組裡貼的 IG／FB／Threads 連結會自動收進這個群組清單。</p>
+        <ul id="bound-line-groups" class="user-list"></ul>
+        <div class="actions">
+          <button id="make-bind-code" type="button" class="secondary">產生綁定碼</button>
+          <button id="refresh-line-groups" type="button" class="secondary">重新整理</button>
+        </div>
+        <ol id="bind-instructions" class="bind-instructions" hidden>
+          <li>把美食地圖的 LINE 官方帳號加進你的 LINE 群組<a id="add-friend-link" target="_blank" rel="noopener noreferrer" hidden>（先加它好友）</a></li>
+          <li>在群組裡傳這段文字：<strong id="bind-text"></strong></li>
+          <li>按「重新整理」，看到群組出現就完成了（綁定碼 30 分鐘內有效、只能用一次）</li>
+        </ol>
+      </section>
       <button id="leave-group" type="button" class="secondary leave-group" hidden>退出這個群組</button>
     </section>
 

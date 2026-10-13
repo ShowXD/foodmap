@@ -4,8 +4,8 @@ const memberList = document.getElementById('member-list');
 const addForm = document.getElementById('add-member-form');
 let me;
 
-async function api(method, body, query = '') {
-  const response = await fetch(`/api/list-members${query}`, {
+async function api(method, body, query = '', path = '/api/list-members') {
+  const response = await fetch(`${path}${query}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -61,7 +61,70 @@ async function load() {
   // Owners can't leave (a group must keep its owner); everyone else can.
   const mine = members.find((member) => member.user_id === me.id);
   leaveButton.hidden = !mine || Boolean(mine.is_owner);
+  lineSection.hidden = !canManage;
+  bindInstructions.hidden = true;
+  if (canManage) await loadLineGroups();
 }
+
+// ---- LINE groups feeding this list (owners bind them with a one-time code) ----
+const lineSection = document.getElementById('line-bind');
+const boundList = document.getElementById('bound-line-groups');
+const bindInstructions = document.getElementById('bind-instructions');
+
+async function loadLineGroups() {
+  const groups = await api('GET', null, `?list=${listId}`, '/api/line-groups');
+  if (!groups.length) {
+    const empty = document.createElement('li');
+    empty.className = 'meta';
+    empty.textContent = '還沒有連結 LINE 群組';
+    boundList.replaceChildren(empty);
+    return;
+  }
+  boundList.replaceChildren(...groups.map((group) => {
+    const item = document.createElement('li');
+    item.className = 'place';
+    const title = document.createElement('h2');
+    title.textContent = `LINE 群組 …${group.group_id.slice(-6)}`;
+    const meta = document.createElement('p');
+    meta.className = 'meta';
+    meta.textContent = group.last_message_at ? `最後訊息 ${group.last_message_at} (UTC)` : `加入於 ${group.first_seen_at} (UTC)`;
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const unbind = document.createElement('button');
+    unbind.type = 'button';
+    unbind.className = 'secondary';
+    unbind.textContent = '解除連結';
+    unbind.addEventListener('click', async () => {
+      if (!confirm('解除後，這個 LINE 群組的連結就不會再收進來。確定？')) return;
+      try {
+        await api('PATCH', { group_id: group.group_id, list_id: null }, '', '/api/line-groups');
+        await loadLineGroups();
+      } catch (error) {
+        message.textContent = `解除失敗：${error.message}`;
+      }
+    });
+    actions.append(unbind);
+    item.append(title, meta, actions);
+    return item;
+  }));
+}
+
+document.getElementById('make-bind-code').addEventListener('click', async () => {
+  try {
+    const { code, add_friend_url: addFriendUrl } = await api('POST', { list_id: listId }, '', '/api/line-bind-code');
+    document.getElementById('bind-text').textContent = `綁定 ${code}`;
+    const addFriend = document.getElementById('add-friend-link');
+    addFriend.hidden = !addFriendUrl;
+    if (addFriendUrl) addFriend.href = addFriendUrl;
+    bindInstructions.hidden = false;
+  } catch (error) {
+    message.textContent = `產生綁定碼失敗：${error.message}`;
+  }
+});
+
+document.getElementById('refresh-line-groups').addEventListener('click', () => {
+  loadLineGroups().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
+});
 
 const leaveButton = document.getElementById('leave-group');
 leaveButton.addEventListener('click', async () => {
