@@ -186,6 +186,8 @@
 - 修正：其他分頁時地圖頁改為 `position: fixed; visibility: hidden`（保持尺寸與畫面），回到地圖立即顯示
 - 仍會產生新 map load 的情況：重新開啟 App、重新整理（手機系統在背景重整網頁也算）
 - 使用者實際遇到的是：到「網站管理」看用量再按返回 → 獨立頁面返回會整個重新載入 App → 每次 +1。已把「網站管理」「群組成員」改成 App 內分頁 `#admin`、`#members?list=ID`（`index.html` 兩個 section；`admin.js`／`members.js` 改為匯出 `showAdmin()`／`showMembers(listId)` 的模組，由 `app.js` 在每次進入分頁時呼叫重新載入資料；`PARENT_TAB` 讓這兩頁時「我的」保持亮起；`admin.html`、`members.html` 已刪除）
+- 後續（使用者要求，2026-10-13）：拿掉「網站管理」入口，改為「我的」頁直接列出四項（只有網站管理員看得到，`.admin-only`）：📊 API 用量 `#usage`、🏠 群組管理 `#groups`、💬 LINE 群組 `#line-groups`、🙋 帳號管理 `#accounts`，各自一頁；`admin.js` `showAdmin(view)` 只載入該頁需要的資料，狀態訊息 `#admin-message` 移到目前頁標題下；分頁顯示改為 JS 切換 `.view.is-active`（取代逐一列出的 CSS 選擇器）
+- Android 手勢列顏色：使用者 Pixel 10 Pro XL 截圖取樣，最底那條是 `#fffaf5`＝manifest `background_color`（之前 `theme_color` 橘色時底部也不是橘色）→ 改為 `#262626`（深色模式導覽列色）。manifest 無法依深淺色切換，淺色模式下底部會是深色；已安裝的 App 要等 Chrome 更新 WebAPK（可能一天以上）或移除重裝才會套用。**未在手機驗證**
 - 驗證：Chrome 走 地圖→我的→網站管理→管理成員→返回→群組成員→地圖，全程同一份文件（navigation 1 次）、`/api/config` 1 次；管理頁用量卡片、群組、成員清單正常、無橫向捲動
 - 驗證：Chrome 切換 5 次分頁 `/api/config` 只呼叫 1 次、隱藏時地圖仍為 780px 高、清單可點且不被遮擋
 

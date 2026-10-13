@@ -87,7 +87,6 @@ async function load() {
   }
   const [users, lists, lineGroups] = await Promise.all([api('/api/users'), api('/api/lists'), api('/api/line-groups')]);
   renderLineGroups(lineGroups, lists.filter((list) => !list.is_personal));
-  message.textContent = `${users.length} 個帳號、${lists.filter((list) => !list.is_personal).length} 個群組`;
 
   groupList.replaceChildren(...lists.filter((list) => !list.is_personal).map((list) => {
     const { item, actions } = card(`👥 ${list.name}`, list.is_member ? '你是成員' : '你不是成員（網站管理員仍可管理）');
@@ -193,8 +192,14 @@ async function loadUsage() {
   document.getElementById('usage-list').replaceChildren(...usage.map(renderUsage));
 }
 
-/** Refreshes the admin tab; called by app.js each time it opens. */
-export function showAdmin() {
-  load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
-  loadUsage().catch((error) => { message.textContent = `用量載入失敗：${error.message}`; });
+/** Refreshes one admin page (usage / groups / line-groups / accounts); called by app.js each time it opens. */
+export function showAdmin(view) {
+  // One status line, moved under the title of whichever admin page is open.
+  document.querySelector(`.view[data-view="${view}"] .view-title`).after(message);
+  message.hidden = false;
+  message.textContent = '載入中…';
+  const loading = view === 'usage' ? loadUsage() : load();
+  loading
+    .then(() => { if (message.textContent === '載入中…') message.textContent = ''; })
+    .catch((error) => { message.textContent = `載入失敗：${error.message}`; });
 }

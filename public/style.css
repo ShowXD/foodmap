@@ -73,13 +73,7 @@ body > main {
   padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + 24px);
 }
 .view { display: none; }
-body[data-view="map"] .view[data-view="map"],
-body[data-view="list"] .view[data-view="list"],
-body[data-view="add"] .view[data-view="add"],
-body[data-view="random"] .view[data-view="random"],
-body[data-view="me"] .view[data-view="me"],
-body[data-view="members"] .view[data-view="members"],
-body[data-view="admin"] .view[data-view="admin"] { display: block; }
+.view.is-active { display: block; }
 .back-link { display: inline-block; margin-bottom: 8px; padding: 6px 0; color: var(--accent); text-decoration: none; }
 /* The map stays laid out (just invisible) on other tabs, so coming back shows it at once instead of
    redrawing from zero size. Switching tabs never creates a new map, so it isn't billed again either way. */

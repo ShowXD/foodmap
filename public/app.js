@@ -13,7 +13,7 @@ const listSelect = $('list-select');
 const visitDialog = $('visit-dialog');
 const visitForm = $('visit-form');
 
-const VIEWS = ['map', 'list', 'add', 'random', 'me', 'members', 'admin'];
+const VIEWS = ['map', 'list', 'add', 'random', 'me', 'members', 'usage', 'groups', 'line-groups', 'accounts'];
 const LIST_STORAGE_KEY = 'foodmap.list';
 const LAYOUT_STORAGE_KEY = 'foodmap.layout';
 const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'note'];
@@ -71,13 +71,14 @@ let currentView = null;
 let hasShownView = false; // the first render (e.g. opening straight into #add from a share) shouldn't animate
 
 // Pages opened from 我的 keep that tab highlighted.
-const PARENT_TAB = { members: 'me', admin: 'me' };
+const ADMIN_VIEWS = ['usage', 'groups', 'line-groups', 'accounts'];
+const PARENT_TAB = Object.fromEntries(['members', ...ADMIN_VIEWS].map((view) => [view, 'me']));
 
 function showView() {
   // Hashes look like "#list" or "#members?list=3".
   const [route, query = ''] = location.hash.slice(1).split('?');
   const view = VIEWS.includes(route) ? route : 'map';
-  if (view === 'admin') showAdmin();
+  if (ADMIN_VIEWS.includes(view)) showAdmin(view);
   if (view === 'members') showMembers(Number(new URLSearchParams(query).get('list')) || currentListId);
   // Not body.dataset.view: an animated switch updates that later, after a following hashchange may already run.
   const previous = currentView;
@@ -87,6 +88,7 @@ function showView() {
   if (hasShownView && previous !== view) hideMapCard();
   const update = () => {
     document.body.dataset.view = view;
+    for (const section of document.querySelectorAll('.view')) section.classList.toggle('is-active', section.dataset.view === view);
     for (const tab of document.querySelectorAll('.tabbar a')) {
       tab.toggleAttribute('aria-current', tab.dataset.tab === (PARENT_TAB[view] ?? view));
     }
@@ -922,7 +924,7 @@ function applyProfile() {
   $('profile-name').textContent = displayName(profile);
   $('user-email').textContent = profile.email;
   $('tab-name').textContent = displayName(profile);
-  $('admin-link').hidden = !profile.isAdmin;
+  for (const link of document.querySelectorAll('.admin-only')) link.hidden = !profile.isAdmin;
   renderAvatar($('avatar-button'), profile);
   renderAvatar($('tab-avatar'), profile);
 }
