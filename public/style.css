@@ -5,7 +5,10 @@
   --text: #212529;
   --muted: #6c757d;
   --accent: #d9480f;
+  --accent-soft: #ffe8d9;
   --border: #e9ecef;
+  --star: #f59f00;
+  --tabbar-height: 64px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,6 +18,7 @@
     --text: #f1f3f5;
     --muted: #adb5bd;
     --accent: #ff8a50;
+    --accent-soft: #3a2a22;
     --border: #3a3a3a;
   }
 }
@@ -28,85 +32,190 @@ body {
   color: var(--text);
 }
 
+/* Shared by admin / members pages */
 header {
   position: sticky;
   top: 0;
+  z-index: 5;
   padding: 12px 16px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
-
+header > a { color: var(--accent); }
 h1 { margin: 0 0 8px; font-size: 1.25rem; color: var(--accent); }
-
-.title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.user-bar { display: flex; gap: 10px; font-size: 0.85rem; color: var(--muted); min-width: 0; }
-.user-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-bar a, header > a { color: var(--accent); }
-.user-bar a[hidden] { display: none; }
-.list-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-.list-row select { font: inherit; flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); }
-.list-row a { color: var(--accent); white-space: nowrap; }
-.list-row a[hidden] { display: none; }
-.inline-form { display: flex; gap: 8px; margin: 12px 0; }
-.inline-form input { flex: 1; }
-.inline-form button { width: auto; white-space: nowrap; }
-.checkbox-label { display: flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--muted); font-size: 0.9rem; }
-.checkbox-label[hidden] { display: none; }
-.checkbox-label input { width: auto; }
-h2.section-title { font-size: 1rem; margin: 24px 0 8px; color: var(--muted); }
-.user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-
 main { max-width: 640px; margin: 0 auto; padding: 16px; }
 
-input, textarea, button {
+input, textarea, select, button {
   font: inherit;
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--card);
   color: var(--text);
 }
-
-button { background: var(--accent); color: #fff; border: none; cursor: pointer; }
+button { background: var(--accent); color: #fff; border: none; cursor: pointer; min-height: 44px; }
 button:disabled { opacity: 0.6; }
 button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
-button[hidden] { display: none; }
+button[hidden], a[hidden] { display: none; }
 input:read-only { color: var(--muted); }
+label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 
-#add-panel { margin-bottom: 16px; }
-#add-panel summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 8px 0; }
-#add-form { display: grid; gap: 10px; }
-#add-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
-
-#ai-candidates { display: grid; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
-#ai-candidates[hidden] { display: none; }
-#ai-candidates legend { color: var(--muted); font-size: 0.9rem; }
-.candidate { display: flex; gap: 8px; align-items: center; }
-.candidate input { width: auto; }
-
+.meta { color: var(--muted); font-size: 0.9rem; }
 #list-message, #form-message { color: var(--muted); margin: 8px 0; }
 
-#place-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+/* ---- App shell: top bar, views, bottom tab bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+.list-name { color: var(--accent); font-weight: 700; text-decoration: none; font-size: 1.1rem; }
 
+body > main { padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + 24px); }
+.view { display: none; }
+body[data-view="map"] .view[data-view="map"],
+body[data-view="list"] .view[data-view="list"],
+body[data-view="add"] .view[data-view="add"],
+body[data-view="me"] .view[data-view="me"] { display: block; }
+.view-title { font-size: 1.15rem; margin: 0 0 12px; }
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.tabbar a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.75rem;
+}
+.tabbar a span { font-size: 1.35rem; line-height: 1; }
+.tabbar a[aria-current] { color: var(--accent); font-weight: 700; }
+.tabbar .tab-add span {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.8rem;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+
+/* ---- Map placeholder & random pick ---- */
+.map-placeholder { text-align: center; display: grid; gap: 10px; padding-top: 24px; }
+.big-emoji { font-size: 3rem; margin: 0; }
+.map-placeholder .place-list { text-align: left; margin-top: 8px; }
+
+/* ---- List: chips & cards ---- */
+#search { margin-bottom: 10px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+.chip {
+  width: auto;
+  flex: none;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+.place-list, #place-list, .user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .place {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 12px 14px;
 }
-.place.visited { opacity: 0.6; }
-.place h2 { margin: 0 0 4px; font-size: 1.1rem; }
-.place p { margin: 2px 0; }
+.place.visited .name { color: var(--muted); }
+.place-head { display: flex; align-items: center; gap: 8px; }
+.place h2 { margin: 0; font-size: 1.1rem; flex: 1; }
+.place p { margin: 4px 0; white-space: pre-line; }
 .place p:empty { display: none; }
-.place .meta, .place .note { color: var(--muted); font-size: 0.9rem; }
+.place .meta, .place .note, .place .family { color: var(--muted); font-size: 0.9rem; }
+.place .family { color: var(--accent); }
+.badge-new { background: var(--accent); color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 0.75rem; }
+.badge-new[hidden] { display: none; }
+.star { width: 44px; min-height: 44px; padding: 0; background: transparent; color: var(--muted); font-size: 1.5rem; border: none; }
+.star.on { color: var(--star); }
 
-.actions { display: flex; gap: 8px; margin-top: 10px; }
-.actions a, .actions button {
-  flex: 1;
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.actions a, .actions button, .actions select {
+  flex: 1 1 auto;
+  width: auto;
+  min-height: 44px;
   text-align: center;
-  padding: 8px;
-  border-radius: 8px;
+  padding: 10px 8px;
+  border-radius: 10px;
   font-size: 0.9rem;
 }
-.actions a { border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
+.actions a { border: 1px solid var(--accent); color: var(--accent); text-decoration: none; display: grid; place-items: center; }
+
+/* ---- Add form ---- */
+#add-form { display: grid; gap: 12px; }
+#ai-candidates { display: grid; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+#ai-candidates[hidden] { display: none; }
+#ai-candidates legend { color: var(--muted); font-size: 0.9rem; }
+.candidate { display: flex; gap: 8px; align-items: center; color: var(--text); }
+.candidate input { width: auto; }
+
+/* ---- 我的 ---- */
+.view[data-view="me"] label { margin: 12px 0; }
+.menu { display: grid; gap: 8px; margin-top: 12px; }
+.menu a {
+  display: block;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* ---- 吃過 dialog ---- */
+dialog {
+  width: min(420px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--text);
+  padding: 16px;
+}
+dialog::backdrop { background: rgb(0 0 0 / 45%); }
+dialog h2 { margin: 0 0 12px; font-size: 1.1rem; }
+#visit-form { display: grid; gap: 12px; }
+.rating { display: flex; gap: 6px; border: none; padding: 0; margin: 0; }
+.rating legend { color: var(--muted); font-size: 0.9rem; margin-bottom: 6px; }
+.rating label { flex: 1; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 10px; min-height: 44px; color: var(--text); }
+.rating label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.rating input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.others { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.9rem; }
+.others:empty { display: none; }
+
+/* ---- Admin / members pages ---- */
+.inline-form { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.inline-form input { flex: 1; min-width: 160px; }
+.inline-form button { width: auto; white-space: nowrap; }
+h2.section-title { font-size: 1rem; margin: 24px 0 8px; color: var(--muted); }
+.checkbox-label { display: flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--muted); font-size: 0.9rem; }
+.checkbox-label[hidden] { display: none; }
+.checkbox-label input { width: auto; }

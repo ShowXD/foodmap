@@ -54,9 +54,26 @@ export async function onRequestGet({ request, env, data }) {
 
   const query = params.get('q')?.trim().slice(0, MAX_QUERY_LENGTH);
   // ponytail: LIKE full scan per list, fine for hundreds of rows; switch to FTS5 if it gets slow
-  const search = query ? `AND (${SEARCH_FIELDS.map((f) => `${f} LIKE ?2`).join(' OR ')})` : '';
-  const statement = env.DB.prepare(`SELECT * FROM places WHERE list_id = ?1 ${search} ORDER BY created_at DESC, id DESC`);
-  const { results } = await (query ? statement.bind(list.id, `%${query}%`) : statement.bind(list.id)).all();
+  const search = query ? `AND (${SEARCH_FIELDS.map((f) => `p.${f} LIKE ?2`).join(' OR ')})` : '';
+  // Personal marks ride along so one request draws the whole list. "新" = added by someone
+  // else after this user last opened the list (never on the very first visit).
+  const { results } = await env.DB
+    .prepare(
+      `SELECT p.*,
+              mv.visited_at AS my_visited_at, mv.rating AS my_rating, mv.note AS my_note,
+              (SELECT COUNT(*) FROM place_visits v WHERE v.place_id = p.id) AS visit_count,
+              (SELECT ROUND(AVG(v.rating), 1) FROM place_visits v WHERE v.place_id = p.id AND v.rating IS NOT NULL) AS avg_rating,
+              CASE WHEN s.user_id IS NULL THEN 0 ELSE 1 END AS starred,
+              CASE WHEN r.read_at IS NOT NULL AND p.created_at > r.read_at AND COALESCE(p.created_by, 0) <> ?3 THEN 1 ELSE 0 END AS is_new
+       FROM places p
+       LEFT JOIN place_visits mv ON mv.place_id = p.id AND mv.user_id = ?3
+       LEFT JOIN place_stars s ON s.place_id = p.id AND s.user_id = ?3
+       LEFT JOIN list_reads r ON r.list_id = p.list_id AND r.user_id = ?3
+       WHERE p.list_id = ?1 ${search}
+       ORDER BY p.created_at DESC, p.id DESC`,
+    )
+    .bind(list.id, query ? `%${query}%` : '', data.user.id)
+    .all();
   return json(results);
 }
 

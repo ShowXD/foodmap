@@ -144,6 +144,19 @@
 - 已受影響的手機需手動清除網站資料或移除主畫面 App 後重新安裝（新 SW 要等能載入網站後才會接手）
 - LINE：使用者已完成 webhook Bypass app，LINE Verify 回 Success（先前 401 為 Cloudflare 與 LINE 的 channel secret 不一致，重設並重新部署後解決）
 
+## v2 計畫（2026-10-13 使用者核准）：地圖優先、底部導覽列、單手操作
+- 導覽列四頁：地圖 / 清單 / ＋ / 我的（hash 路由 `#map` `#list` `#add` `#me`）
+- 階段 A（不需 Google，進行中，分支 `feature/v2-nav-personal`）：導覽列骨架；每人各自「吃過」＋評分心得（`place_visits`）；想吃星號（`place_stars`）；最近新增「新」（`list_reads`）；待整理區（沒店名／之後沒座標）；篩選 chips（未吃／吃過／★／標籤）；分享單一店家（Web Share）；匯出 CSV；`migrations/0007_personal.sql`
+- 階段 B（需使用者建 Google Cloud 專案與金鑰）：Google 地圖、我的位置、標點卡片、附近＋距離、今天吃什麼、拖曳修正位置；Places Text Search 取座標；CSP 加 Google 網域；Maps 金鑰由 `/api/config` 提供、Places 金鑰為 secret
+- 階段 C：營業時間／Google 評分（Place Details，7 天快取）、影片縮圖（og:image 存 R2）
+- 待查證：Places/Maps 各 SKU 免費額度、Google CSP 網域、R2 綁定、只貼連結時的抓取成功率（待使用者給真實連結）
+- 完整計畫：見 Claude 計畫檔（摘要即本節）
+- **階段 A ✅（2026-10-13 完成並本機驗證）**
+  - 後端：`schema.sql` 加 `place_visits`/`place_stars`/`list_reads`、`migrations/0007_personal.sql`（舊 `status='visited'` 且有 `created_by` 轉入 visits）、`lib/lists.js` 加 `findAccessiblePlace`、新 API `functions/api/visits.js`（GET ?place= 全家評價／PUT 吃過＋評分心得／DELETE）、`stars.js`、`list-read.js`、`export.js`（CSV，BOM，防公式注入）；`places.js` GET 帶回 `my_visited_at/my_rating/my_note/visit_count/avg_rating/starred/is_new`（「新」＝別人在我上次開清單後新增）
+  - 前端：`index.html` 四個 view（hash 路由 `#map/#list/#add/#me`）＋底部固定導覽列（＋ 置中）；地圖頁暫為「即將推出」＋「今天吃什麼」（從我未吃過的店隨機抽）；清單頁篩選 chips（全部／未吃／吃過／★／待整理 N／#標籤）；卡片含星號、新標記、家人摘要、吃過（評分 1–5＋心得 dialog，可看家人評價）、分享（Web Share／複製）、編輯（跳 #add）；「我的」頁含清單切換、成員、匯出 CSV、網站管理、登出。舊的 `places.status` 不再使用
+  - 驗證：`npm test` 39/39（`test/personal.test.mjs` 5 項）；本機 wrangler＋Chrome 390×844 手機模擬：導覽列、切換清單、星號、吃過評分（顯示家人評價、更新為 2 人吃過平均 4.5）、四種篩選與標籤、編輯跳轉與取消、今天吃什麼、匯出 CSV 200，console 無錯誤／無 CSP 違規
+  - 部署前需對 remote 跑 `migrations/0007_personal.sql`
+
 ## 下一步
 1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人

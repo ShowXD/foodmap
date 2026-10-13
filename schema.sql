@@ -52,6 +52,32 @@ CREATE TABLE IF NOT EXISTS line_groups (
   last_message_at TEXT
 );
 
+-- Each person's own "吃過" mark, with an optional 1-5 rating and note family members can read.
+CREATE TABLE IF NOT EXISTS place_visits (
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  place_id INTEGER NOT NULL REFERENCES places (id) ON DELETE CASCADE,
+  visited_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+  note TEXT,
+  PRIMARY KEY (user_id, place_id)
+);
+
+-- Personal "想吃" star.
+CREATE TABLE IF NOT EXISTS place_stars (
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  place_id INTEGER NOT NULL REFERENCES places (id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, place_id)
+);
+
+-- When each person last opened each list, to mark places added since then as "新".
+CREATE TABLE IF NOT EXISTS list_reads (
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  list_id INTEGER NOT NULL REFERENCES lists (id) ON DELETE CASCADE,
+  read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, list_id)
+);
+
 -- Per-user daily AI extraction count (day = UTC YYYY-MM-DD) to protect the shared free quota.
 CREATE TABLE IF NOT EXISTS extract_usage (
   user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
