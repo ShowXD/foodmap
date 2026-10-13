@@ -5,6 +5,7 @@ import { recordUsage } from '../../../lib/usage.js';
 const MAX_LINKS_PER_MESSAGE = 3;
 // Shared with the in-app button's free Workers AI quota; past this, links are saved without AI.
 export const LINE_DAILY_AI_LIMIT = 50;
+export const LINE_LIST_DAILY_AI_LIMIT = 20;
 const MAX_CAPTION_LENGTH = 5000;
 
 const encoder = new TextEncoder();
@@ -43,11 +44,18 @@ async function boundListId(db, groupId) {
   return row?.list_id ?? null;
 }
 
-async function usedLineAiToday(db) {
+// LINE links have no signed-in person to count against, so the limit is per list (one friend group
+// can't use up everyone's AI) on top of the site-wide one.
+async function canUseLineAi(db, listId) {
   const row = await db
-    .prepare("SELECT COUNT(DISTINCT line_message_id || url) AS n FROM places WHERE source = 'line' AND date(created_at) = date('now')")
+    .prepare(
+      `SELECT COUNT(DISTINCT line_message_id || url) AS total,
+              COUNT(DISTINCT CASE WHEN list_id = ? THEN line_message_id || url END) AS this_list
+       FROM places WHERE source = 'line' AND date(created_at) = date('now')`,
+    )
+    .bind(listId)
     .first();
-  return row.n;
+  return row.total < LINE_DAILY_AI_LIMIT && row.this_list < LINE_LIST_DAILY_AI_LIMIT;
 }
 
 async function savePlace(db, listId, messageId, url, caption, place = {}) {
@@ -90,7 +98,7 @@ async function collectLinks(env, event) {
 
     const caption = messageText || (await fetchCaption(url));
     let places = [];
-    if (caption && env.AI && (await usedLineAiToday(env.DB)) < LINE_DAILY_AI_LIMIT) {
+    if (caption && env.AI && (await canUseLineAi(env.DB, listId))) {
       await recordUsage(env.DB, 'workers_ai');
       ({ places = [] } = await extractPlaces(env.AI, caption));
     }

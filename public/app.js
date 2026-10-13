@@ -391,7 +391,7 @@ function loadGoogleMaps(key) {
 
 async function initMap() {
   const config = await api('GET', null, '', '/api/config');
-  if (!config.mapsKey || !config.mapId) throw new Error('地圖尚未設定');
+  if (!config.mapsKey || !config.mapId) throw new Error(config.error || '地圖尚未設定');
   await loadGoogleMaps(config.mapsKey);
   const [{ Map: GoogleMap }, library] = await Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]);
   markerLibrary = library;

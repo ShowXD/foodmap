@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
-import { dayIn, recordUsage, usageReport } from '../lib/usage.js';
+import { dayIn, recordUsage, takeUserQuota, usageReport } from '../lib/usage.js';
 import * as usage from '../functions/api/usage.js';
 import * as config from '../functions/api/config.js';
 
@@ -44,4 +44,36 @@ test('usage page is for site admins only; opening the map counts one map load', 
   await get(config.onRequestGet, member, { GOOGLE_MAPS_BROWSER_KEY: 'key', GOOGLE_MAPS_MAP_ID: 'map' });
   const report = await (await get(usage.onRequestGet, admin)).json();
   assert.equal(report.find((entry) => entry.api === 'maps_load').today, 1);
+});
+
+test('per-person daily limit: calls past it are refused and not counted', async () => {
+  const DB = createTestDb();
+  const friend = await ensureUser(DB, 'friend@example.test', {});
+  const results = [];
+  for (let index = 0; index < 22; index++) results.push(await takeUserQuota(DB, friend.id, 'places_search', NOW));
+  assert.equal(results.filter(Boolean).length, 20);
+  assert.equal(results.at(-1), false);
+  const row = DB.sqlite.prepare('SELECT count FROM user_daily_usage WHERE user_id = ?').get(friend.id);
+  assert.equal(row.count, 20);
+  assert.equal(await takeUserQuota(DB, friend.id, 'places_search', new Date('2026-10-15T05:00:00Z')), true, 'a new day starts fresh');
+});
+
+test('past the map limit no key is handed out; the admin page shows who used what today', async () => {
+  const DB = createTestDb();
+  const admin = await ensureUser(DB, 'admin@example.test', { ADMIN_EMAILS: 'admin@example.test' });
+  const friend = await ensureUser(DB, 'friend@example.test', {});
+  DB.sqlite.exec(`UPDATE users SET display_name = '小美' WHERE id = ${friend.id}`);
+  const env = { DB, GOOGLE_MAPS_BROWSER_KEY: 'key', GOOGLE_MAPS_MAP_ID: 'map' };
+  const configFor = async (user) => (await config.onRequestGet({ request: new Request('https://example.test/api/config'), env, data: { user } })).json();
+
+  for (let index = 0; index < 30; index++) assert.equal((await configFor(friend)).mapsKey, 'key');
+  const refused = await configFor(friend);
+  assert.deepEqual([refused.mapsKey, Boolean(refused.error)], [null, true]);
+  assert.equal((await configFor(admin)).mapsKey, 'key', 'other people are unaffected');
+
+  const report = await (await usage.onRequestGet({ request: new Request('https://example.test/api/usage'), env, data: { user: admin } })).json();
+  const maps = report.find((entry) => entry.api === 'maps_load');
+  assert.equal(maps.today, 31);
+  assert.deepEqual(maps.top_users, [{ name: '小美', count: 30 }, { name: 'admin@example.test', count: 1 }]);
+  assert.deepEqual(report.find((entry) => entry.api === 'place_details').top_users, []);
 });

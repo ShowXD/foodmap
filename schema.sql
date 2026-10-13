@@ -109,6 +109,23 @@ CREATE TABLE IF NOT EXISTS place_thumbnails (
   fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Per-person daily counts for APIs that have a per-person limit (see lib/usage.js APIS.perUserDaily).
+CREATE TABLE IF NOT EXISTS user_daily_usage (
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  api TEXT NOT NULL,
+  day TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, api, day)
+);
+
+-- One-time codes a group owner sends in their LINE group ("綁定 CODE") to bind it to their list.
+CREATE TABLE IF NOT EXISTS line_bind_codes (
+  code TEXT PRIMARY KEY,
+  list_id INTEGER NOT NULL REFERENCES lists (id) ON DELETE CASCADE,
+  created_by INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  expires_at TEXT NOT NULL
+);
+
 -- Daily call counts per outside API (see lib/usage.js); day is in the timezone the provider resets its quota.
 CREATE TABLE IF NOT EXISTS api_usage (
   api TEXT NOT NULL,

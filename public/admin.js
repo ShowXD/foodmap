@@ -184,6 +184,15 @@ function renderUsage(entry) {
   axis.className = 'meta usage-axis';
   axis.textContent = `近 30 天（單日最高 ${formatNumber(highest)} 次）`;
   item.append(title, today, bar, month, chart, axis);
+
+  if (entry.per_user_daily) {
+    const people = document.createElement('p');
+    people.className = 'meta';
+    people.textContent = `每人每天最多 ${formatNumber(entry.per_user_daily)} 次。今天：${
+      entry.top_users.length ? entry.top_users.map((person) => `${person.name} ${formatNumber(person.count)}`).join('、') : '還沒有人用'
+    }`;
+    item.append(people);
+  }
   return item;
 }
 

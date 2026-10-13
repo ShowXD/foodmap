@@ -183,6 +183,7 @@
 
 ## 開放給朋友使用（2026-10-13 使用者核准計畫，進行中）
 - 決定：共用同一網站（費用在使用者帳上，靠每人每日上限）、任何 Google 帳號可登入、網站管理員維持看得到所有群組、朋友 LINE 群組由群組擁有者用綁定碼自己綁。三個分支：open-groups → per-user-limits → line-bind-code，最後改文件與 Access 原則說明、加隱私權頁
+- **2. 每人每日上限＋看得到誰用的 ✅（已本機驗證）**：`migrations/0012_friends.sql`（`user_daily_usage`，以及第 3 步要用的 `line_bind_codes`）；`lib/usage.js` `APIS.perUserDaily`（地圖載入 30、地點搜尋 20、AI 擷取 30、座標更新不限）與 `takeUserQuota`（到上限時不再累加，`ON CONFLICT … DO UPDATE … WHERE count < 上限`）；`/api/config` 超過上限不給金鑰（前端顯示「今天開地圖的次數已用完」）、`/api/place-search` 超過回 429、`/api/extract` 改用 `takeUserQuota`（`extract_usage` 表不再寫入）；LINE 每個清單每天最多 20 次 AI（全站 50 次保留，`canUseLineAi`）；`/api/usage` 多回 `per_user_daily`、`top_users`，管理頁每張卡片顯示「每人每天最多 N 次。今天：某某 12、…」。驗證：`npm test` 59/59（usage 2 項、line 1 項）；本機管理頁顯示今日使用者
 - **1. 任何人建群組／退出群組 ✅（已本機驗證）**：`POST /api/lists` 不再限管理員，一般人建立的群組擁有者固定是自己（`owner_email` 只有管理員能指定），每人最多擁有 10 個（429）；`DELETE /api/list-members` 成員可移除自己（擁有者仍不能離開、個人清單 404）。前端：清單選單旁「＋」開 dialog 建群組並自動切過去；群組成員頁非擁有者顯示「退出這個群組」，退出後 `foodmap:lists-changed` 事件讓 `app.js` 重新載入清單。驗證：`npm test` 56/56（`test/lists.test.mjs` 新增 2 項）；本機以 A 建群組並邀請 B、再以 B 登入：只看到自己的清單與該群組，A 的「家人」與個人清單皆 404，退出後選單只剩「我的清單」
 
 ## 切換分頁時地圖保持繪製（2026-10-13，已本機驗證）

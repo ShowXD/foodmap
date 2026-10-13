@@ -76,6 +76,19 @@ test('bound group: each shop the AI finds is saved once, even if LINE redelivers
   ]);
 });
 
+test('one list can use at most 20 AI extractions a day; after that links are saved bare', async () => {
+  let aiCalls = 0;
+  const countingAI = { run: async () => { aiCalls++; return twoShopsAI.run(); } };
+  const { DB, send, places } = setup(countingAI);
+  DB.sqlite.exec(`INSERT INTO line_groups (group_id, list_id) VALUES ('${GROUP}', 1)`);
+  const earlier = Array.from({ length: 20 }, (_, index) => `(1, 'https://fb.watch/old${index}', '舊店', 'line', 'old${index}')`).join(', ');
+  DB.sqlite.exec(`INSERT INTO places (list_id, url, name, source, line_message_id) VALUES ${earlier}`);
+
+  await send([textEvent('m9', '好吃 https://www.instagram.com/reel/new/')]);
+  assert.equal(aiCalls, 0);
+  assert.deepEqual(places().filter((place) => place.line_message_id === 'm9').map((place) => place.name), ['']);
+});
+
 test('links are never lost: AI failure or no caption saves the bare link', async () => {
   const failingAI = { run: async () => { throw new Error('quota'); } };
   const { DB, send, places } = setup(failingAI);
