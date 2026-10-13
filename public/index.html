@@ -26,10 +26,6 @@
           <button id="drag-cancel" type="button" class="secondary">取消</button>
         </div>
       </div>
-      <div id="map-card" class="map-sheet" hidden>
-        <button id="map-card-close" type="button" class="close" aria-label="關閉卡片">✕</button>
-        <ul class="place-list"></ul>
-      </div>
       <div class="map-controls">
         <button id="fit-all" type="button" class="map-button" aria-label="顯示全部店家" title="顯示全部店家">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
@@ -41,10 +37,16 @@
     </section>
 
     <section class="view" data-view="list" aria-label="清單">
-      <input id="search" type="search" placeholder="搜尋店名、食物、地區、標籤…" aria-label="搜尋">
+      <div class="list-tools">
+        <input id="search" type="search" placeholder="搜尋店名、食物、地區、標籤…" aria-label="搜尋">
+        <div class="layout-toggle" role="group" aria-label="排列方式">
+          <button type="button" data-layout="rows" aria-label="列表">☰</button>
+          <button type="button" data-layout="grid" aria-label="縮圖">▦</button>
+        </div>
+      </div>
       <div id="filter-chips" class="chips" role="group" aria-label="篩選"></div>
       <p id="list-message" role="status"></p>
-      <ul id="place-list" class="place-list"></ul>
+      <ul id="place-list" class="place-rows"></ul>
     </section>
 
     <section class="view" data-view="add" aria-label="新增店家">
@@ -103,6 +105,12 @@
       </nav>
     </section>
   </main>
+
+  <!-- One shop's full card, sliding up over whichever page opened it. -->
+  <div id="map-card" class="map-sheet" hidden>
+    <button id="map-card-close" type="button" class="close" aria-label="關閉卡片">✕</button>
+    <ul class="place-list"></ul>
+  </div>
 
   <nav class="tabbar" aria-label="主選單">
     <a href="#map" data-tab="map"><span aria-hidden="true">🗺️</span>地圖</a>

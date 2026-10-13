@@ -181,6 +181,15 @@
 - 狀態列顏色：`theme-color` 改為依深淺色模式與 App 背景同色（原本橘色）；manifest `theme_color` 同步
 - 驗證：Chrome 390×844：五顆按鈕中心 39/117/195/273/351（左右對稱）、隨機頁距離與標籤篩選、在地圖上看開卡片
 
+## 清單兩種排列＋影片縮圖＋底部卡片（2026-10-13，已本機驗證）
+- 清單頁搜尋框旁切換「☰ 列表」（一列一家：縮圖 56px、店名、距離·食物·地區、新／★／✓評分）與「▦ 縮圖」（兩欄方塊，寬螢幕三欄）；選擇記在 localStorage `foodmap.layout`
+- 點任一家 → 底部滑出完整卡片（`#map-card` 移到 body 層，各頁共用；卡片頂部有 180px 縮圖、✕ 有深色底以免被圖蓋住）；換頁時自動關閉（在 `showView` 同步判斷，用 `currentView` 變數而非 `body.dataset.view`，因為動畫版切換會晚一步更新 dataset，造成「在地圖上看」剛打開的卡片被關掉——本機驗證時發現並修正）
+- 縮圖：`GET /thumb/:placeId`（`functions/thumb/[id].js`，經 middleware 登入＋`findAccessiblePlace`）；第一次看時抓貼文頁 og:image（只限 IG/FB/Threads 網域、圖片需 https、型別 jpeg/png/webp/gif、≤1 MB），存進 D1 `place_thumbnails`（BLOB；D1 讀回是數字陣列，用 `new Uint8Array` 轉）；失敗記錄 NULL，3 天內不重抓；回應 `Cache-Control: private, max-age=604800`；沒圖時前端顯示 🍜 佔位
+- `extract.js` 重構：`fetchSocialPage`（共用抓頁）、`readOgMeta`、`readLimited` 改回傳 `{bytes, truncated}`；`fetchCaption` 行為不變
+- `migrations/0010_thumbnails.sql`＋`schema.sql`
+- 未驗證：真實 IG/FB/Threads 貼文是否給得到 og:image（本機用假連結，只驗證了存圖與顯示流程）
+- 驗證：`npm test` 51/51（新 `test/thumb.test.mjs` 2 項：只抓一次並存 DB、非成員 404、非社群網址不抓、SVG／超過 1 MB 拒絕、失敗 3 天內不重抓）；Chrome 390×844：列表／縮圖切換與記憶、D1 圖片顯示、佔位圖、點擊開卡片、換頁關卡片、今天吃什麼→在地圖上看卡片保持開啟
+
 ## API 用量（2026-10-13，已本機驗證；分支 `feature/api-usage`）
 - 做法：App 自己記錄每次對外 API 呼叫（不是讀 Google Cloud Monitoring——那需要 service account 金鑰，使用者若要和帳單完全一致的數字再評估）
 - `migrations/0009_api_usage.sql`＋`schema.sql`：`api_usage(api, day, count)`；`lib/usage.js`：`APIS`（每日上限與 Google Cloud 配額一致：地圖載入 300、地點搜尋 100、座標更新 30；每月免費 10,000／5,000／10,000；AI 擷取每日約 140 次＝10,000 neurons ÷ 約 70，估計值）、`dayIn`（Google 以太平洋時間、Workers AI 以 UTC 計日，與各自配額重置時間一致）、`recordUsage`、`usageReport`（今日、本月、近 30 天補零）

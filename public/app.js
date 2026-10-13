@@ -12,6 +12,7 @@ const visitForm = $('visit-form');
 
 const VIEWS = ['map', 'list', 'add', 'random', 'me'];
 const LIST_STORAGE_KEY = 'foodmap.list';
+const LAYOUT_STORAGE_KEY = 'foodmap.layout';
 const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'note'];
 
 const TAIWAN = { lat: 23.7, lng: 120.96 };
@@ -20,6 +21,7 @@ let lists = [];
 let currentListId = null;
 let places = [];
 let filter = { mode: 'all', tag: null };
+let layout = readSetting(LAYOUT_STORAGE_KEY) === 'grid' ? 'grid' : 'rows';
 let myPosition = null;
 let locationError = null;
 
@@ -62,11 +64,17 @@ async function api(method, body, query = '', path = '/api/places') {
 }
 
 // ---- Views (hash routing keeps the phone's back button working) ----
+let currentView = null;
 let hasShownView = false; // the first render (e.g. opening straight into #add from a share) shouldn't animate
 
 function showView() {
   const view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'map';
-  const previous = document.body.dataset.view;
+  // Not body.dataset.view: an animated switch updates that later, after a following hashchange may already run.
+  const previous = currentView;
+  currentView = view;
+  // The shop card belongs to the page that opened it. Done before the (async) transition update,
+  // so a caller can open a card right after switching pages.
+  if (hasShownView && previous !== view) hideMapCard();
   const update = () => {
     document.body.dataset.view = view;
     for (const tab of document.querySelectorAll('.tabbar a')) {
@@ -99,8 +107,54 @@ function familySummary(place) {
   return parts.join(' · ');
 }
 
+// The video's preview image; when there is none, the frame's CSS placeholder shows instead.
+function thumbnailFor(place, className) {
+  const frame = document.createElement('div');
+  frame.className = `thumb ${className}`;
+  const image = document.createElement('img');
+  image.loading = 'lazy';
+  image.alt = '';
+  image.src = `/thumb/${place.id}`;
+  image.addEventListener('error', () => image.remove());
+  frame.append(image);
+  return frame;
+}
+
+// A compact row (layout "rows") or a thumbnail tile (layout "grid"); tapping opens the full card.
+function renderListItem(place, itemLayout) {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = itemLayout === 'grid' ? 'tile' : 'row';
+  button.classList.toggle('visited', Boolean(place.my_visited_at));
+
+  const name = document.createElement('strong');
+  name.textContent = place.name || '（待整理）';
+  const distance = distanceTo(place);
+  const details = document.createElement('span');
+  details.className = 'meta';
+  details.textContent = [distance != null && formatDistance(distance), itemLayout === 'grid' ? '' : place.dishes, place.area]
+    .filter(Boolean).join(' · ');
+  const marks = document.createElement('span');
+  marks.className = 'marks';
+  marks.textContent = [
+    place.is_new && '新',
+    place.starred && '★',
+    place.my_visited_at && (place.my_rating ? `✓${place.my_rating}` : '✓'),
+  ].filter(Boolean).join(' ');
+
+  const text = document.createElement('span');
+  text.className = 'item-text';
+  text.append(name, details);
+  button.append(thumbnailFor(place, itemLayout === 'grid' ? 'thumb-tile' : 'thumb-row'), text, marks);
+  button.addEventListener('click', () => showMapCard(place));
+  item.append(button);
+  return item;
+}
+
 function renderPlace(place) {
   const card = placeTemplate.content.firstElementChild.cloneNode(true);
+  card.prepend(thumbnailFor(place, 'thumb-card'));
   const isVisited = Boolean(place.my_visited_at);
   card.classList.toggle('visited', isVisited);
   card.querySelector('.name').textContent = place.name || '（待整理：還沒有店名）';
@@ -251,7 +305,11 @@ function renderPlaces() {
   if (filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
   renderMarkers();
   refreshMapCard();
-  placeList.replaceChildren(...shown.map(renderPlace));
+  placeList.className = layout === 'grid' ? 'place-grid' : 'place-rows';
+  for (const button of document.querySelectorAll('.layout-toggle button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
+  }
+  placeList.replaceChildren(...shown.map((place) => renderListItem(place, layout)));
   const query = searchInput.value.trim();
   if (shown.length) listMessage.textContent = '';
   else if (places.length) listMessage.textContent = '沒有符合篩選的店';
@@ -270,6 +328,14 @@ async function loadPlaces({ markRead = false } = {}) {
   } catch (error) {
     listMessage.textContent = `載入失敗：${error.message}`;
   }
+}
+
+for (const button of document.querySelectorAll('.layout-toggle button')) {
+  button.addEventListener('click', () => {
+    layout = button.dataset.layout;
+    saveSetting(LAYOUT_STORAGE_KEY, layout);
+    renderPlaces();
+  });
 }
 
 let searchTimer;
@@ -441,6 +507,7 @@ function refreshMapCard() {
 
 function focusPlace(place) {
   location.hash = '#map';
+  showView(); // switch now (hashchange comes later) so the card isn't closed by the page change
   showMapCard(place);
   if (map && isLocated(place)) {
     map.panTo(latLngOf(place));
@@ -766,6 +833,22 @@ function prefillFromShare() {
 
 // ---- Lists and "我的" ----
 // Remembering the last list is a convenience; storage can be blocked (private mode), so failures just fall back.
+function readSetting(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function saveSetting(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Not remembering the choice is fine.
+  }
+}
+
 function readSavedListId() {
   try {
     return Number(localStorage.getItem(LIST_STORAGE_KEY));

@@ -55,20 +55,22 @@ function decodeEntities(text) {
   });
 }
 
-// Pulls og:title / og:description; attribute order differs between sites, so match both orders.
-export function parseOgText(html) {
-  const read = (property) => {
-    const pattern = new RegExp(
-      `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${property}["']`,
-      'i',
-    );
-    const match = html.match(pattern);
-    return match ? decodeEntities(match[1] ?? match[2]).trim() : '';
-  };
-  return [...new Set([read('og:title'), read('og:description')].filter(Boolean))].join('\n');
+// Reads one og:* meta tag; attribute order differs between sites, so match both orders.
+export function readOgMeta(html, property) {
+  const pattern = new RegExp(
+    `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${property}["']`,
+    'i',
+  );
+  const match = html.match(pattern);
+  return match ? decodeEntities(match[1] ?? match[2]).trim() : '';
 }
 
-export async function fetchCaption(url) {
+export function parseOgText(html) {
+  return [...new Set([readOgMeta(html, 'og:title'), readOgMeta(html, 'og:description')].filter(Boolean))].join('\n');
+}
+
+/** The start of an IG/FB/Threads page (where the og tags are), or '' when it can't be read. */
+export async function fetchSocialPage(url) {
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'facebookexternalhit/1.1', 'Accept-Language': 'zh-TW,zh;q=0.9' },
@@ -79,22 +81,30 @@ export async function fetchCaption(url) {
       await response.body?.cancel();
       return '';
     }
-    return parseOgText(await readLimited(response, MAX_PAGE_BYTES));
+    return new TextDecoder().decode((await readLimited(response, MAX_PAGE_BYTES)).bytes);
   } catch (error) {
-    console.warn('Caption fetch failed', url, error.message);
+    console.warn('Social page fetch failed', url, error.message);
     return '';
   }
 }
 
-async function readLimited(response, maxBytes) {
+export const fetchCaption = async (url) => parseOgText(await fetchSocialPage(url));
+
+/** Reads at most maxBytes; `truncated` is true once the limit is reached (a body of exactly maxBytes counts too). */
+export async function readLimited(response, maxBytes) {
   const reader = response.body.getReader();
   const chunks = [];
   let total = 0;
-  while (total < maxBytes) {
+  let truncated = false;
+  while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     chunks.push(value);
     total += value.byteLength;
+    if (total >= maxBytes) {
+      truncated = true;
+      break;
+    }
   }
   await reader.cancel();
   const bytes = new Uint8Array(Math.min(total, maxBytes));
@@ -104,7 +114,7 @@ async function readLimited(response, maxBytes) {
     bytes.set(slice, offset);
     offset += slice.byteLength;
   }
-  return new TextDecoder().decode(bytes);
+  return { bytes, truncated };
 }
 
 // Counts the call up front (UTC day) and reports whether it is still within the daily limit.

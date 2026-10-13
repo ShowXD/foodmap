@@ -269,6 +269,9 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0007_personal.sql` | 每人各自的「吃過」評分、想吃星號、「新」標示 | 還沒有 `place_visits` 表的資料庫 |
 | `0008_location.sql` | 店家在地圖上的位置（Google 地點 ID、座標） | `places` 還沒有 `lat` 欄位的資料庫 |
 | `0009_api_usage.sql` | 各 API 每日呼叫次數（網站管理頁的用量圖表） | 還沒有 `api_usage` 表的資料庫 |
+| `0010_thumbnails.sql` | 影片縮圖（存 IG/FB 的預覽圖） | 還沒有 `place_thumbnails` 表的資料庫 |
+
+> 若 `--file` 出現 `Authentication error [code: 10000]`（匯入 API 的權限問題），改用 `--command "<SQL>"` 直接執行；各 migration 檔開頭有單行版本或內容很短可直接貼上。
 
 全新建立的資料庫只要跑 `schema.sql`，它已經是最新結構，不用再跑 `migrations/`。
 

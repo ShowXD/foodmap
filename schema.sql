@@ -92,6 +92,14 @@ CREATE TABLE IF NOT EXISTS extract_usage (
   PRIMARY KEY (user_id, day)
 );
 
+-- Video preview images (og:image) copied once, since IG/FB image links expire; image NULL = fetch failed.
+CREATE TABLE IF NOT EXISTS place_thumbnails (
+  place_id INTEGER PRIMARY KEY REFERENCES places (id) ON DELETE CASCADE,
+  content_type TEXT,
+  image BLOB,
+  fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Daily call counts per outside API (see lib/usage.js); day is in the timezone the provider resets its quota.
 CREATE TABLE IF NOT EXISTS api_usage (
   api TEXT NOT NULL,

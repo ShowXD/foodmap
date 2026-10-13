@@ -180,15 +180,20 @@ html[data-direction="back"]::view-transition-new(page) { animation-name: slide-f
   background: var(--card);
   box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
 }
-.map-sheet:not([hidden]) ~ .map-controls { display: none; }
+body:has(#map-card:not([hidden])) .map-controls,
+body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 #map-card .place { border: none; }
+/* Sits on top of the card's thumbnail, so it needs its own backdrop to stay visible. */
 #map-card .close {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
   width: 44px;
-  background: transparent;
-  color: var(--muted);
+  padding: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
   font-size: 1.1rem;
 }
 #map-card .place-head { padding-right: 40px; }
@@ -203,8 +208,44 @@ html[data-direction="back"]::view-transition-new(page) { animation-name: slide-f
   box-shadow: 0 0 0 6px rgb(26 115 232 / 25%);
 }
 
-/* ---- List: chips & cards ---- */
-#search { margin-bottom: 10px; }
+/* ---- List: search + layout toggle, chips, rows / tiles ---- */
+.list-tools { display: flex; gap: 8px; margin-bottom: 10px; }
+.layout-toggle { display: flex; gap: 4px; }
+.layout-toggle button { width: 44px; padding: 0; background: var(--card); color: var(--muted); border: 1px solid var(--border); font-size: 1.1rem; }
+.layout-toggle button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+/* Thumbnails: the image covers the frame; with no image the frame shows a placeholder. */
+.thumb { position: relative; overflow: hidden; background: var(--accent-soft); display: grid; place-items: center; }
+.thumb::before { content: "🍜"; font-size: 1.6rem; opacity: 0.6; }
+.thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.thumb-row { width: 56px; height: 56px; border-radius: 10px; flex: none; }
+.thumb-tile { width: 100%; aspect-ratio: 1; border-radius: 12px 12px 0 0; }
+.thumb-card { margin: -12px -14px 10px; height: 180px; border-radius: 14px 14px 0 0; }
+.thumb-card::before { font-size: 2.4rem; }
+
+.place-rows, .place-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.place-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 600px) { .place-grid { grid-template-columns: repeat(3, 1fr); } }
+.row, .tile {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.row { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; }
+.tile { position: relative; display: flex; flex-direction: column; height: 100%; }
+.item-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.tile .item-text { padding: 8px 10px 10px; }
+.item-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-text .meta { font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.visited strong, .tile.visited strong { color: var(--muted); }
+.marks { color: var(--accent); font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+.marks:empty { display: none; }
+.tile .marks { position: absolute; top: 6px; right: 6px; padding: 2px 8px; border-radius: 999px; background: var(--card); }
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
 .chip {
   width: auto;
