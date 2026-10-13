@@ -1,3 +1,6 @@
+import { showAdmin } from './admin.js';
+import { showMembers } from './members.js';
+
 const $ = (id) => document.getElementById(id);
 const searchInput = $('search');
 const placeList = $('place-list');
@@ -10,7 +13,7 @@ const listSelect = $('list-select');
 const visitDialog = $('visit-dialog');
 const visitForm = $('visit-form');
 
-const VIEWS = ['map', 'list', 'add', 'random', 'me'];
+const VIEWS = ['map', 'list', 'add', 'random', 'me', 'members', 'admin'];
 const LIST_STORAGE_KEY = 'foodmap.list';
 const LAYOUT_STORAGE_KEY = 'foodmap.layout';
 const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'note'];
@@ -67,8 +70,15 @@ async function api(method, body, query = '', path = '/api/places') {
 let currentView = null;
 let hasShownView = false; // the first render (e.g. opening straight into #add from a share) shouldn't animate
 
+// Pages opened from 我的 keep that tab highlighted.
+const PARENT_TAB = { members: 'me', admin: 'me' };
+
 function showView() {
-  const view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'map';
+  // Hashes look like "#list" or "#members?list=3".
+  const [route, query = ''] = location.hash.slice(1).split('?');
+  const view = VIEWS.includes(route) ? route : 'map';
+  if (view === 'admin') showAdmin();
+  if (view === 'members') showMembers(Number(new URLSearchParams(query).get('list')) || currentListId);
   // Not body.dataset.view: an animated switch updates that later, after a following hashchange may already run.
   const previous = currentView;
   currentView = view;
@@ -78,7 +88,7 @@ function showView() {
   const update = () => {
     document.body.dataset.view = view;
     for (const tab of document.querySelectorAll('.tabbar a')) {
-      tab.toggleAttribute('aria-current', tab.dataset.tab === view);
+      tab.toggleAttribute('aria-current', tab.dataset.tab === (PARENT_TAB[view] ?? view));
     }
     window.scrollTo(0, 0);
   };
@@ -862,7 +872,7 @@ function selectList(listId) {
   currentListId = list.id;
   listSelect.value = String(list.id);
   $('members-link').hidden = Boolean(list.is_personal);
-  $('members-link').href = `/members?list=${list.id}`;
+  $('members-link').href = `#members?list=${list.id}`;
   $('export-link').href = `/api/export?list=${list.id}`;
   filter = { mode: 'all', tag: null };
   try {

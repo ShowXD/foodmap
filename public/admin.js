@@ -92,7 +92,7 @@ async function load() {
   groupList.replaceChildren(...lists.filter((list) => !list.is_personal).map((list) => {
     const { item, actions } = card(`👥 ${list.name}`, list.is_member ? '你是成員' : '你不是成員（網站管理員仍可管理）');
     const link = document.createElement('a');
-    link.href = `/members?list=${list.id}`;
+    link.href = `#members?list=${list.id}`;
     link.textContent = '管理成員';
     actions.append(link);
     return item;
@@ -193,5 +193,8 @@ async function loadUsage() {
   document.getElementById('usage-list').replaceChildren(...usage.map(renderUsage));
 }
 
-load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
-loadUsage().catch((error) => { message.textContent = `用量載入失敗：${error.message}`; });
+/** Refreshes the admin tab; called by app.js each time it opens. */
+export function showAdmin() {
+  load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
+  loadUsage().catch((error) => { message.textContent = `用量載入失敗：${error.message}`; });
+}

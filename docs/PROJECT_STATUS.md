@@ -184,7 +184,9 @@
 ## 切換分頁時地圖保持繪製（2026-10-13，已本機驗證）
 - 使用者回報切換頁面後地圖「重新抓取」擔心浪費預算。查證：Google Dynamic Maps 的計費事件是「成功的 map load」（建立 `google.maps.Map`），拖曳、縮放、切圖層不另計；本 App 每次開啟只建立一次地圖（`mapReady`），正式環境 `api_usage` 只記到 5 次 map load。看到的「重抓」是地圖頁 `display: none` 後回來從 0 尺寸重繪
 - 修正：其他分頁時地圖頁改為 `position: fixed; visibility: hidden`（保持尺寸與畫面），回到地圖立即顯示
-- 仍會產生新 map load 的情況：重新開啟 App、重新整理、從「群組成員」「網站管理」（獨立頁面）返回
+- 仍會產生新 map load 的情況：重新開啟 App、重新整理（手機系統在背景重整網頁也算）
+- 使用者實際遇到的是：到「網站管理」看用量再按返回 → 獨立頁面返回會整個重新載入 App → 每次 +1。已把「網站管理」「群組成員」改成 App 內分頁 `#admin`、`#members?list=ID`（`index.html` 兩個 section；`admin.js`／`members.js` 改為匯出 `showAdmin()`／`showMembers(listId)` 的模組，由 `app.js` 在每次進入分頁時呼叫重新載入資料；`PARENT_TAB` 讓這兩頁時「我的」保持亮起；`admin.html`、`members.html` 已刪除）
+- 驗證：Chrome 走 地圖→我的→網站管理→管理成員→返回→群組成員→地圖，全程同一份文件（navigation 1 次）、`/api/config` 1 次；管理頁用量卡片、群組、成員清單正常、無橫向捲動
 - 驗證：Chrome 切換 5 次分頁 `/api/config` 只呼叫 1 次、隱藏時地圖仍為 780px 高、清單可點且不被遮擋
 
 ## 個人名稱與大頭貼（2026-10-13，已本機驗證）

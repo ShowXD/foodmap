@@ -1,4 +1,4 @@
-const listId = Number(new URLSearchParams(location.search).get('list'));
+let listId = 0;
 const message = document.getElementById('members-message');
 const memberList = document.getElementById('member-list');
 const addForm = document.getElementById('add-member-form');
@@ -53,7 +53,6 @@ async function load() {
   me ??= await fetch('/api/me').then((response) => response.json());
   const { list, members, canManage } = await api('GET', null, `?list=${listId}`);
   document.getElementById('group-title').textContent = `👥 ${list.name}`;
-  document.title = `美食地圖・${list.name}`;
   addForm.hidden = !canManage;
   // Only site admins hand out ownership (the API ignores is_owner from anyone else).
   document.getElementById('owner-option').hidden = !me.isAdmin;
@@ -77,4 +76,10 @@ addForm.addEventListener('submit', async (event) => {
   }
 });
 
-load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
+/** Shows one group's members; called by app.js each time the members tab opens. */
+export function showMembers(groupListId) {
+  listId = groupListId;
+  message.textContent = '載入中…';
+  memberList.replaceChildren();
+  load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
+}

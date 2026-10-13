@@ -105,11 +105,47 @@
       <input id="avatar-file" type="file" accept="image/*" aria-label="選擇大頭貼照片" hidden>
       <label>目前清單 <select id="list-select" aria-label="切換清單"></select></label>
       <nav class="menu">
-        <a id="members-link" href="/members" hidden>👥 群組成員</a>
+        <a id="members-link" href="#members" hidden>👥 群組成員</a>
         <a id="export-link" href="/api/export" download>⬇️ 匯出這份清單（CSV）</a>
-        <a id="admin-link" href="/admin" hidden>⚙️ 網站管理</a>
+        <a id="admin-link" href="#admin" hidden>⚙️ 網站管理</a>
         <a href="/cdn-cgi/access/logout">🚪 登出</a>
       </nav>
+    </section>
+    <section class="view" data-view="members" aria-label="群組成員">
+      <a class="back-link" href="#me">← 我的</a>
+      <h2 id="group-title" class="view-title">群組成員</h2>
+      <form id="add-member-form" class="inline-form" hidden>
+        <input name="email" type="email" required placeholder="輸入對方登入用的 email" aria-label="成員 email">
+        <label id="owner-option" class="checkbox-label" hidden><input name="is_owner" type="checkbox"> 設為擁有者</label>
+        <button type="submit">加入</button>
+      </form>
+      <p id="members-message" role="status">載入中…</p>
+      <ul id="member-list" class="user-list"></ul>
+    </section>
+
+    <section class="view" data-view="admin" aria-label="網站管理">
+      <a class="back-link" href="#me">← 我的</a>
+      <h2 class="view-title">網站管理</h2>
+      <p id="admin-message" role="status">載入中…</p>
+
+      <h2 class="section-title">API 用量</h2>
+      <p class="meta">這是 App 自己記錄的呼叫次數，計費以 Google Cloud 主控台為準。Google 的每日上限是你在 Google Cloud 設的配額，台灣時間下午 3–4 點重置；AI 擷取的上限是依每日免費額度估算，台灣時間早上 8 點重置。</p>
+      <div id="usage-list" class="usage-list"></div>
+
+      <h2 class="section-title">群組</h2>
+      <form id="create-group-form" class="inline-form">
+        <input name="name" required maxlength="50" placeholder="群組名稱，例如：家人" aria-label="群組名稱">
+        <input name="owner_email" type="email" placeholder="擁有者 email（空白＝你自己）" aria-label="擁有者 email">
+        <button type="submit">建立</button>
+      </form>
+      <ul id="group-list" class="user-list"></ul>
+
+      <h2 class="section-title">LINE 群組</h2>
+      <p class="meta">Bot 加入群組後會出現在這裡。綁定到清單後，群組裡的 IG/FB 連結才會自動收進該清單；沒綁定的群組一律不收。</p>
+      <ul id="line-group-list" class="user-list"></ul>
+
+      <h2 class="section-title">帳號</h2>
+      <ul id="user-list" class="user-list"></ul>
     </section>
   </main>
 
