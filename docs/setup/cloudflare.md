@@ -266,6 +266,8 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0004_lists.sql` | 個人清單與群組清單；舊店家搬進「家人」群組；取消審核 | 跑過 0003、還沒有 `lists` 表的資料庫 |
 | `0005_extract_usage.sql` | AI 擷取每人每日次數紀錄（上限 30 次） | 還沒有 `extract_usage` 表的資料庫 |
 | `0006_line.sql` | LINE Bot：記錄店家來自哪則 LINE 訊息、Bot 加入的群組 | 還沒有 `line_groups` 表的資料庫 |
+| `0007_personal.sql` | 每人各自的「吃過」評分、想吃星號、「新」標示 | 還沒有 `place_visits` 表的資料庫 |
+| `0008_location.sql` | 店家在地圖上的位置（Google 地點 ID、座標） | `places` 還沒有 `lat` 欄位的資料庫 |
 
 全新建立的資料庫只要跑 `schema.sql`，它已經是最新結構，不用再跑 `migrations/`。
 

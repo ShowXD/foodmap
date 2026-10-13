@@ -171,7 +171,8 @@ test('every response carries security headers and API responses are not cached',
     await runMiddleware('https://foodmap.pages.dev/', { DB: db }),
   ]) {
     assert.match(response.headers.get('Content-Security-Policy'), /frame-ancestors 'none'/);
-    assert.match(response.headers.get('Content-Security-Policy'), /script-src 'self';/);
+    const scriptSrc = response.headers.get('Content-Security-Policy').match(/script-src ([^;]+)/)[1];
+    assert.ok(scriptSrc.startsWith("'self'") && !scriptSrc.includes('unsafe-inline'), scriptSrc);
     assert.equal(response.headers.get('X-Frame-Options'), 'DENY');
     assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
   }

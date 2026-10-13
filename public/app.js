@@ -14,16 +14,32 @@ const VIEWS = ['map', 'list', 'add', 'me'];
 const LIST_STORAGE_KEY = 'foodmap.list';
 const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'note'];
 
+const TAIWAN = { lat: 23.7, lng: 120.96 };
+const RANDOM_RADIUS_KM = 5;
+
 let lists = [];
 let currentListId = null;
 let places = [];
 let filter = { mode: 'all', tag: null };
+let myPosition = null;
 
-const mapsUrl = (place) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '))}`;
-// Places saved from LINE with only a link have no name yet and need tidying.
-const needsTidying = (place) => !place.name;
+const mapsUrl = (place) => {
+  const query = encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '));
+  return `https://www.google.com/maps/search/?api=1&query=${query}${place.google_place_id ? `&query_place_id=${encodeURIComponent(place.google_place_id)}` : ''}`;
+};
+const isLocated = (place) => place.lat != null && place.lng != null;
+// LINE places may have only a link (no name) or no map position yet.
+const needsTidying = (place) => !place.name || !isLocated(place);
 const tagsOf = (place) => String(place.tags ?? '').split(/\s+/).filter(Boolean);
+
+function distanceKm(from, to) {
+  const radians = (degrees) => (degrees * Math.PI) / 180;
+  const a = Math.sin(radians(to.lat - from.lat) / 2) ** 2 +
+    Math.cos(radians(from.lat)) * Math.cos(radians(to.lat)) * Math.sin(radians(to.lng - from.lng) / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+const distanceTo = (place) => (myPosition && isLocated(place) ? distanceKm(myPosition, place) : null);
+const formatDistance = (km) => (km < 1 ? `${Math.round(km * 1000)} 公尺` : `${km.toFixed(1)} 公里`);
 
 async function api(method, body, query = '', path = '/api/places') {
   const response = await fetch(`${path}${query}`, {
@@ -53,6 +69,11 @@ function showView() {
     tab.toggleAttribute('aria-current', tab.dataset.tab === view);
   }
   window.scrollTo(0, 0);
+  // Every map created is a billed map load, so only create it once someone actually opens the map.
+  if (view === 'map' && !mapReady) {
+    mapReady = initMap();
+    mapReady.catch(showMapFallback);
+  }
 }
 window.addEventListener('hashchange', showView);
 
@@ -71,7 +92,13 @@ function renderPlace(place) {
   card.querySelector('.name').textContent = place.name || '（待整理：還沒有店名）';
   card.querySelector('.badge-new').hidden = !place.is_new;
   card.querySelector('.dishes').textContent = place.dishes || '';
-  card.querySelector('.meta').textContent = [place.area, place.tags, place.source === 'line' ? '來自 LINE' : ''].filter(Boolean).join(' · ');
+  const distance = distanceTo(place);
+  card.querySelector('.meta').textContent = [
+    distance != null && `📍 ${formatDistance(distance)}`,
+    place.area,
+    place.tags,
+    place.source === 'line' && '來自 LINE',
+  ].filter(Boolean).join(' · ');
   card.querySelector('.family').textContent = familySummary(place);
   card.querySelector('.note').textContent = [place.note, place.my_note && `我的心得：${place.my_note}`].filter(Boolean).join('\n');
   card.querySelector('.video').href = place.url;
@@ -90,6 +117,9 @@ function renderPlace(place) {
   visit.textContent = isVisited ? `吃過${place.my_rating ? ` ${place.my_rating}★` : ''}` : '吃過了';
   visit.classList.toggle('secondary', isVisited);
   visit.addEventListener('click', () => openVisitDialog(place));
+  const locate = card.querySelector('.locate');
+  locate.textContent = isLocated(place) ? '修正位置' : '📍 定位';
+  locate.addEventListener('click', () => (isLocated(place) ? startDrag(place) : openLocateDialog(place)));
   card.querySelector('.share').addEventListener('click', () => sharePlace(place));
   card.querySelector('.edit').addEventListener('click', () => startEdit(place));
   return card;
@@ -180,6 +210,7 @@ function matchesFilter(place) {
   if (filter.mode === 'visited' && !place.my_visited_at) return false;
   if (filter.mode === 'starred' && !place.starred) return false;
   if (filter.mode === 'untidy' && !needsTidying(place)) return false;
+  if (filter.mode === 'near' && distanceTo(place) == null) return false;
   if (filter.tag && !tagsOf(place).includes(filter.tag)) return false;
   return true;
 }
@@ -187,17 +218,24 @@ function matchesFilter(place) {
 function renderChips() {
   const untidy = places.filter(needsTidying).length;
   const modes = [['all', '全部'], ['todo', '未吃'], ['visited', '吃過'], ['starred', '★ 想吃']];
+  if (myPosition) modes.splice(1, 0, ['near', '📍 附近']);
   if (untidy) modes.push(['untidy', `待整理 ${untidy}`]);
   const tags = [...new Set(places.flatMap(tagsOf))].sort();
-  filterChips.replaceChildren(
-    ...modes.map(([mode, label]) => chip(label, filter.mode === mode, () => { filter.mode = mode; renderPlaces(); })),
-    ...tags.map((tag) => chip(`#${tag}`, filter.tag === tag, () => { filter.tag = filter.tag === tag ? null : tag; renderPlaces(); })),
-  );
+  // The list and the map share one filter, so both rows show the same chips.
+  for (const container of [filterChips, $('map-chips')]) {
+    container.replaceChildren(
+      ...modes.map(([mode, label]) => chip(label, filter.mode === mode, () => { filter.mode = mode; renderPlaces(); })),
+      ...tags.map((tag) => chip(`#${tag}`, filter.tag === tag, () => { filter.tag = filter.tag === tag ? null : tag; renderPlaces(); })),
+    );
+  }
 }
 
 function renderPlaces() {
   renderChips();
   const shown = places.filter(matchesFilter);
+  if (filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
+  renderMarkers();
+  refreshMapCard();
   placeList.replaceChildren(...shown.map(renderPlace));
   const query = searchInput.value.trim();
   if (shown.length) listMessage.textContent = '';
@@ -225,16 +263,290 @@ searchInput.addEventListener('input', () => {
   searchTimer = setTimeout(loadPlaces, 300);
 });
 
-// ---- 今天吃什麼 ----
-$('random-pick').addEventListener('click', () => {
-  const candidates = places.filter((place) => place.name && !place.my_visited_at);
-  const result = $('random-result');
-  if (!candidates.length) {
-    result.replaceChildren();
-    alert('這份清單裡沒有還沒吃過的店了');
+// ---- Map ----
+const mapCard = $('map-card');
+let mapReady = null;
+let map = null;
+let markerLibrary = null;
+let markers = [];
+let myMarker = null;
+let hasFittedMap = false;
+let mapCardPlaceId = null;
+let draggingPlace = null;
+let dragMarker = null;
+
+function showMapFallback(error) {
+  console.error('Map unavailable', error);
+  $('map').hidden = true;
+  $('map-fallback').hidden = false;
+  $('map-fallback-text').textContent = `地圖無法使用（${error.message}），清單、定位與今天吃什麼仍可使用。`;
+}
+
+// Google calls this global when the key is rejected (wrong domain, API not enabled, quota used up).
+window.gm_authFailure = () => showMapFallback(new Error('Google 地圖金鑰無法使用'));
+
+function loadGoogleMaps(key) {
+  return new Promise((resolve, reject) => {
+    window.foodmapMapsReady = resolve;
+    const script = document.createElement('script');
+    const params = new URLSearchParams({ key, v: 'weekly', loading: 'async', language: 'zh-TW', region: 'TW', callback: 'foodmapMapsReady' });
+    script.src = `https://maps.googleapis.com/maps/api/js?${params}`;
+    script.onerror = () => reject(new Error('Google 地圖載入失敗'));
+    document.head.append(script);
+  });
+}
+
+async function initMap() {
+  const config = await api('GET', null, '', '/api/config');
+  if (!config.mapsKey || !config.mapId) throw new Error('地圖尚未設定');
+  await loadGoogleMaps(config.mapsKey);
+  const [{ Map: GoogleMap }, library] = await Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]);
+  markerLibrary = library;
+  $('map').hidden = false;
+  $('map-fallback').hidden = true;
+  map = new GoogleMap($('map'), {
+    center: TAIWAN,
+    zoom: 7,
+    mapId: config.mapId,
+    gestureHandling: 'greedy', // one finger pans, which is what phone users expect
+    disableDefaultUI: true,
+    clickableIcons: false,
+  });
+  map.addListener('click', (event) => {
+    if (dragMarker) dragMarker.position = event.latLng;
+    else hideMapCard();
+  });
+  showMyPosition(true);
+  renderMarkers();
+}
+
+const latLngOf = (place) => ({ lat: place.lat, lng: place.lng });
+const PIN_COLORS = { starred: ['#f59f00', '#b37400'], visited: ['#adb5bd', '#868e96'], todo: ['#d9480f', '#a8380b'] };
+
+function pinFor(place) {
+  const [background, borderColor] = PIN_COLORS[place.starred ? 'starred' : place.my_visited_at ? 'visited' : 'todo'];
+  return new markerLibrary.PinElement({ background, borderColor, glyphColor: '#fff' });
+}
+
+function renderMarkers() {
+  if (!map) return;
+  for (const marker of markers) marker.map = null;
+  const shown = places.filter((place) => isLocated(place) && matchesFilter(place) && place.id !== draggingPlace?.id);
+  markers = shown.map((place) => {
+    const marker = new markerLibrary.AdvancedMarkerElement({ map, position: latLngOf(place), title: place.name || '', content: pinFor(place), gmpClickable: true });
+    marker.addEventListener('gmp-click', () => showMapCard(place));
+    return marker;
+  });
+  // Frame the shops once per list; after that the map stays where the person moved it.
+  if (!hasFittedMap && shown.length) {
+    hasFittedMap = true;
+    if (shown.length === 1) {
+      map.setCenter(latLngOf(shown[0]));
+      map.setZoom(15);
+    } else {
+      const bounds = new google.maps.LatLngBounds();
+      for (const place of shown) bounds.extend(latLngOf(place));
+      map.fitBounds(bounds, 48);
+    }
+  }
+}
+
+function watchMyPosition() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(
+    (position) => {
+      const isFirstFix = !myPosition;
+      myPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
+      showMyPosition(isFirstFix);
+      if (isFirstFix) renderPlaces(); // distances and the 附近 chip appear
+    },
+    (error) => console.warn('Location unavailable', error.message),
+    { enableHighAccuracy: true, maximumAge: 60000 },
+  );
+}
+
+// Runs on every location fix and once the map is ready, whichever comes last draws the dot.
+function showMyPosition(shouldCenter) {
+  if (!map || !myPosition) return;
+  if (myMarker) {
+    myMarker.position = myPosition;
     return;
   }
-  result.replaceChildren(renderPlace(candidates[Math.floor(Math.random() * candidates.length)]));
+  const dot = document.createElement('div');
+  dot.className = 'my-dot';
+  myMarker = new markerLibrary.AdvancedMarkerElement({ map, position: myPosition, content: dot, title: '我的位置', zIndex: 1000 });
+  $('locate-me').hidden = false;
+  if (shouldCenter && !places.some(isLocated)) {
+    map.setCenter(myPosition);
+    map.setZoom(14);
+  }
+}
+
+$('locate-me').addEventListener('click', () => {
+  if (!map || !myPosition) return;
+  map.panTo(myPosition);
+  map.setZoom(Math.max(map.getZoom(), 15));
+});
+
+function showMapCard(place) {
+  mapCardPlaceId = place.id;
+  mapCard.querySelector('ul').replaceChildren(renderPlace(place));
+  mapCard.hidden = false;
+}
+
+function hideMapCard() {
+  mapCardPlaceId = null;
+  mapCard.hidden = true;
+}
+$('map-card-close').addEventListener('click', hideMapCard);
+
+// Keeps the open card in sync after 吃過/★/編輯 reload the list.
+function refreshMapCard() {
+  const place = places.find((candidate) => candidate.id === mapCardPlaceId);
+  if (place) showMapCard(place);
+  else hideMapCard();
+}
+
+function focusPlace(place) {
+  location.hash = '#map';
+  showMapCard(place);
+  if (map && isLocated(place)) {
+    map.panTo(latLngOf(place));
+    map.setZoom(Math.max(map.getZoom(), 15));
+  }
+}
+
+// ---- Fixing a position by dragging ----
+async function startDrag(place) {
+  location.hash = '#map';
+  showView(); // starts the map now if it was never opened; hashchange fires too late to await it
+  try {
+    await mapReady;
+  } catch {
+    alert('地圖無法使用，沒辦法放標點');
+    return;
+  }
+  hideMapCard();
+  draggingPlace = place;
+  const position = isLocated(place) ? latLngOf(place) : myPosition ?? map.getCenter().toJSON();
+  dragMarker = new markerLibrary.AdvancedMarkerElement({ map, position, gmpDraggable: true, title: place.name || '', content: pinFor(place) });
+  map.panTo(position);
+  map.setZoom(Math.max(map.getZoom(), 17));
+  $('drag-bar').hidden = false;
+  renderMarkers();
+}
+
+function endDrag() {
+  const place = draggingPlace;
+  dragMarker.map = null;
+  dragMarker = null;
+  draggingPlace = null;
+  $('drag-bar').hidden = true;
+  return place;
+}
+
+$('drag-save').addEventListener('click', async () => {
+  const position = dragMarker.position;
+  // The marker reports a LatLng after dragging but the literal it was given before.
+  const lat = typeof position.lat === 'function' ? position.lat() : position.lat;
+  const lng = typeof position.lng === 'function' ? position.lng() : position.lng;
+  const place = endDrag();
+  try {
+    await api('PUT', { place_id: place.id, lat, lng }, '', '/api/place-location');
+    await loadPlaces();
+    const updated = places.find((candidate) => candidate.id === place.id);
+    if (updated) showMapCard(updated);
+  } catch (error) {
+    alert(`儲存位置失敗：${error.message}`);
+    renderMarkers();
+  }
+});
+
+$('drag-cancel').addEventListener('click', () => {
+  endDrag();
+  renderMarkers();
+});
+
+// ---- Finding a shop on Google ----
+const locateDialog = $('locate-dialog');
+const locateForm = $('locate-form');
+const locateMessage = $('locate-message');
+let locatingPlace = null;
+
+function openLocateDialog(place) {
+  locatingPlace = place;
+  $('locate-title').textContent = `${place.name || '這家店'}在哪裡？`;
+  locateForm.elements.query.value = '';
+  $('locate-candidates').replaceChildren();
+  locateDialog.showModal();
+  if (place.name) searchLocation();
+  else locateMessage.textContent = '還沒有店名，請輸入要搜尋的文字';
+}
+
+async function searchLocation() {
+  const place = locatingPlace;
+  locateMessage.textContent = '搜尋中…';
+  try {
+    const { query, candidates } = await api('POST', { place_id: place.id, query: locateForm.elements.query.value }, '', '/api/place-search');
+    locateForm.elements.query.value = query;
+    $('locate-candidates').replaceChildren(...candidates.map((candidate) => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary';
+      const name = document.createElement('strong');
+      name.textContent = candidate.name;
+      const address = document.createElement('span');
+      address.textContent = candidate.address;
+      button.append(name, address);
+      button.addEventListener('click', () => chooseLocation(place, candidate));
+      item.append(button);
+      return item;
+    }));
+    locateMessage.textContent = candidates.length ? '點選正確的那一家' : '找不到，換個關鍵字，或自己在地圖上放';
+  } catch (error) {
+    locateMessage.textContent = error.message;
+  }
+}
+
+async function chooseLocation(place, candidate) {
+  locateMessage.textContent = '儲存中…';
+  try {
+    const { google_place_id, lat, lng } = candidate;
+    await api('PUT', { place_id: place.id, google_place_id, lat, lng }, '', '/api/place-location');
+    locateDialog.close('cancel');
+    await loadPlaces();
+    const updated = places.find((candidateRow) => candidateRow.id === place.id);
+    if (updated) focusPlace(updated);
+  } catch (error) {
+    locateMessage.textContent = `儲存失敗：${error.message}`;
+  }
+}
+
+// Enter in the search box submits the form; keep the dialog open and search instead of closing it.
+locateForm.addEventListener('submit', (event) => {
+  if (event.submitter?.value !== 'search') return;
+  event.preventDefault();
+  searchLocation();
+});
+
+locateDialog.addEventListener('close', () => {
+  const place = locatingPlace;
+  locatingPlace = null;
+  if (place && locateDialog.returnValue === 'manual') startDrag(place);
+});
+
+// ---- 今天吃什麼 ----
+$('random-pick').addEventListener('click', () => {
+  let candidates = places.filter((place) => place.name && !place.my_visited_at && matchesFilter(place));
+  // Prefer somewhere close by; fall back to anywhere when nothing is within reach.
+  const nearby = candidates.filter((place) => (distanceTo(place) ?? Infinity) <= RANDOM_RADIUS_KM);
+  if (nearby.length) candidates = nearby;
+  if (!candidates.length) {
+    alert('沒有符合篩選、還沒吃過的店了');
+    return;
+  }
+  focusPlace(candidates[Math.floor(Math.random() * candidates.length)]);
 });
 
 // ---- Add / edit form ----
@@ -430,7 +742,8 @@ async function loadLists() {
 listSelect.addEventListener('change', () => {
   selectList(Number(listSelect.value));
   resetForm();
-  $('random-result').replaceChildren();
+  hideMapCard();
+  hasFittedMap = false;
   loadPlaces({ markRead: true });
 });
 
@@ -446,6 +759,7 @@ if ('serviceWorker' in navigator) {
 }
 
 prefillFromShare();
+watchMyPosition();
 showView();
 loadLists()
   .then(() => loadPlaces({ markRead: true }))

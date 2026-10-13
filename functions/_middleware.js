@@ -8,10 +8,14 @@ const WAITING_PATHS = new Set(['/pending', '/pending.html', '/pending.js', '/api
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-// No inline scripts anywhere, so script-src can stay 'self'; frame-ancestors blocks clickjacking.
+// No inline scripts anywhere, so script-src needs no 'unsafe-inline'; frame-ancestors blocks clickjacking.
+// Google domains follow the Maps JavaScript API allowlist CSP guide (its 'unsafe-eval' is required by the API).
+const GOOGLE_MAPS = 'https://*.googleapis.com https://*.gstatic.com *.google.com';
 const SECURITY_HEADERS = {
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; " +
+    `default-src 'self'; script-src 'self' 'unsafe-eval' ${GOOGLE_MAPS} https://*.ggpht.com *.googleusercontent.com blob:; ` +
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: ${GOOGLE_MAPS} *.googleusercontent.com; ` +
+    `connect-src 'self' ${GOOGLE_MAPS} data: blob:; font-src https://fonts.gstatic.com; frame-src *.google.com; worker-src 'self' blob:;` +
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'",
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',

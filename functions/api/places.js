@@ -1,4 +1,5 @@
 import { findAccessibleList } from '../../lib/lists.js';
+import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
 const SEARCH_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'note', 'caption'];
@@ -47,10 +48,12 @@ async function readJson(request) {
 
 const listNotFound = () => json({ error: 'list not found' }, 404);
 
-export async function onRequestGet({ request, env, data }) {
+export async function onRequestGet({ request, env, data, waitUntil }) {
   const params = new URL(request.url).searchParams;
   const list = await findAccessibleList(env.DB, data.user, Number(params.get('list')));
   if (!list) return listNotFound();
+  await expireGoogleLocations(env.DB, list.id);
+  if (env.GOOGLE_PLACES_KEY) waitUntil(refreshStaleLocations(env.DB, env.GOOGLE_PLACES_KEY, list.id));
 
   const query = params.get('q')?.trim().slice(0, MAX_QUERY_LENGTH);
   // ponytail: LIKE full scan per list, fine for hundreds of rows; switch to FTS5 if it gets slow

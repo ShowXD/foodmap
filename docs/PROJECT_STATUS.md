@@ -159,10 +159,20 @@
   - 前端：`index.html` 四個 view（hash 路由 `#map/#list/#add/#me`）＋底部固定導覽列（＋ 置中）；地圖頁暫為「即將推出」＋「今天吃什麼」（從我未吃過的店隨機抽）；清單頁篩選 chips（全部／未吃／吃過／★／待整理 N／#標籤）；卡片含星號、新標記、家人摘要、吃過（評分 1–5＋心得 dialog，可看家人評價）、分享（Web Share／複製）、編輯（跳 #add）；「我的」頁含清單切換、成員、匯出 CSV、網站管理、登出。舊的 `places.status` 不再使用
   - 驗證：`npm test` 39/39（`test/personal.test.mjs` 5 項）；本機 wrangler＋Chrome 390×844 手機模擬：導覽列、切換清單、星號、吃過評分（顯示家人評價、更新為 2 人吃過平均 4.5）、四種篩選與標籤、編輯跳轉與取消、今天吃什麼、匯出 CSV 200，console 無錯誤／無 CSP 違規
   - 部署前需對 remote 跑 `migrations/0007_personal.sql`
+- **階段 B ✅（2026-10-13 實作並本機驗證；分支 `feature/google-map`；尚未部署、尚未用真實金鑰實測）**
+  - 使用者已完成 Google Cloud 設定（配額：SearchText 每日 100／每分 10、GetPlace 每日 30／每分 10；預算警示），三個 secret 已存進 Cloudflare production
+  - 後端：`migrations/0008_location.sql`＋`schema.sql`（`places` 加 `google_place_id`、`lat`、`lng`、`location_source` google|manual、`location_fetched_at`）；`lib/google.js`（Text Search 欄位遮罩 `places.id,displayName,formattedAddress,location`＝Pro；Details 只取 `location`＝Essentials；`saveLocation`／`clearLocation`；`expireGoogleLocations` 把超過 30 天的 Google 座標清空；`refreshStaleLocations` 每次開清單最多重抓 5 筆超過 25 天的，Google 回 404 就清回待整理；`isSameShop` 名稱互含判斷）；新 API `config.js`（GET 給前端 Maps 金鑰與 Map ID）、`place-search.js`（POST 最多 3 個候選，不存任何 Google 內容；429→「今天的 Google 查詢次數已用完」）、`place-location.js`（PUT 有 google_place_id＝Google 來源會過期、沒有＝手動永久；DELETE 清除）；`places.js` GET 先清過期座標再查、背景重抓；LINE webhook 存店後若 Google 第一名名稱相符就自動定位，不確定的留在待整理
+  - ponytail：沒有 cron，座標只在有人開清單時才過期清除／重抓（30 天內沒人開時資料庫仍留著舊座標，但不會被提供）
+  - CSP（middleware）：依官方 allowlist 加 Google 網域與 `'unsafe-eval'`，**不加** script `'unsafe-inline'`；`worker-src 'self' blob:`（只寫 blob: 會擋掉自己的 sw.js，本機驗證時發現）
+  - 前端：地圖頁滿版 Google 地圖（第一次打開地圖頁才建立，省地圖載入次數；`gestureHandling: greedy` 單指拖曳）；標點顏色：橘＝未吃、灰＝我吃過、金＝想吃；點標點跳出底部卡片；藍點＝我的位置（啟動即 `watchPosition`，清單頁也有距離）；地圖上方與清單共用篩選 chips，有定位時多「📍 附近」（依距離排序）；待整理＝沒店名或沒座標；卡片「📍 定位」開對話框搜尋 Google 候選（標示「搜尋結果由 Google 地圖提供」），或「自己在地圖上放」；已定位的店「修正位置」可拖曳或點地圖移動標點；今天吃什麼優先抽 5 公里內、符合篩選、我未吃過的店並移動地圖打開卡片；導航連結帶 `query_place_id`；金鑰錯誤（`gm_authFailure`）或未設定時顯示文字提示，清單功能照常
+  - 注意：Google 會在地圖元素本身加 `position: relative`，所以滿版定位放在外層 `.map-frame`
+  - 驗證：`npm test` 46/46（新 `test/google.test.mjs` 7 項：欄位遮罩、名稱比對、權限 404／未設定 503／配額 429、手動 vs Google 來源、30 天過期不提供、重抓與 404 清除、LINE 自動定位只採名稱相符者）；本機 wrangler（假金鑰）＋Chrome 390×844：無 CSP 違規、地圖區域填滿頂列與導覽列之間、chips 與附近、距離、定位對話框（假金鑰顯示失敗訊息）、從清單「自己在地圖上放」→ 地圖 → 儲存為 manual 並開卡片、今天吃什麼選最近的、卡片不溢出。**未驗證**：真實 Google 地圖畫面、標點點擊、拖曳、Text Search 真實結果（需正式金鑰，限定網域）
+  - 未做：Places API 政策要求的使用條款／隱私權頁面（階段 C 前補）
 
 ## 下一步
 1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
 3. 使用者照 `docs/setup/line.md` 申請 LINE、設 `LINE_CHANNEL_SECRET`、跑 0006、部署、建 webhook Bypass app、設 Webhook URL、拉 Bot 進群組並在管理頁綁定「家人」，實測擷取品質
 4. 待決：登入是否加密碼方式（使用者保留選擇：A 外接 Auth0 類服務經 Access OIDC／B 自建／C 維持 OTP + Google）
-5. 路線圖：Google 地圖
+5. 階段 B 上線：remote 跑 `migrations/0007_personal.sql`（若尚未）與 `migrations/0008_location.sql` → `npm run deploy` → 使用者手機實測地圖、定位、拖曳、Google 搜尋候選
+6. 階段 C：營業時間／Google 評分（開卡片即時查、每日上限、標示 Google）、使用條款／隱私權頁、影片縮圖（R2，需改 `wrangler.toml`）

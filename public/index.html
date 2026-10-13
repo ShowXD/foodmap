@@ -16,12 +16,26 @@
 
   <main>
     <section class="view" data-view="map" aria-label="地圖">
-      <div class="map-placeholder">
+      <div class="map-frame"><div id="map" class="map" hidden></div></div>
+      <div id="map-fallback" class="map-placeholder">
         <p class="big-emoji" aria-hidden="true">🗺️</p>
-        <p>地圖功能即將推出，接上 Google 地圖後就會顯示所有店家和你的位置。</p>
-        <button id="random-pick" type="button">🎲 今天吃什麼</button>
-        <p class="meta">從還沒吃過的店裡隨機抽一家</p>
-        <ul id="random-result" class="place-list"></ul>
+        <p id="map-fallback-text">地圖載入中…</p>
+      </div>
+      <div id="map-chips" class="chips map-chips" role="group" aria-label="地圖篩選"></div>
+      <div id="drag-bar" class="map-sheet drag-bar" hidden>
+        <p>拖曳標點，或點地圖，把位置放到店家門口</p>
+        <div class="actions">
+          <button id="drag-save" type="button">儲存位置</button>
+          <button id="drag-cancel" type="button" class="secondary">取消</button>
+        </div>
+      </div>
+      <div id="map-card" class="map-sheet" hidden>
+        <button id="map-card-close" type="button" class="close" aria-label="關閉卡片">✕</button>
+        <ul class="place-list"></ul>
+      </div>
+      <div class="map-tools">
+        <button id="locate-me" type="button" class="round secondary" aria-label="回到我的位置" hidden>📍</button>
+        <button id="random-pick" type="button" class="random">🎲 今天吃什麼</button>
       </div>
     </section>
 
@@ -98,6 +112,23 @@
     </form>
   </dialog>
 
+  <dialog id="locate-dialog">
+    <form method="dialog" id="locate-form">
+      <h2 id="locate-title">店在哪裡？</h2>
+      <div class="inline-form">
+        <input name="query" aria-label="搜尋文字" maxlength="100">
+        <button value="search">搜尋</button>
+      </div>
+      <ul id="locate-candidates" class="candidates"></ul>
+      <p id="locate-message" class="meta" role="status"></p>
+      <p class="meta attribution">搜尋結果由 Google 地圖提供</p>
+      <div class="actions">
+        <button value="manual" class="secondary">自己在地圖上放</button>
+        <button value="cancel" class="secondary">關閉</button>
+      </div>
+    </form>
+  </dialog>
+
   <template id="place-template">
     <li class="place">
       <div class="place-head">
@@ -113,6 +144,7 @@
         <a class="video" target="_blank" rel="noopener noreferrer">影片</a>
         <a class="maps" target="_blank" rel="noopener noreferrer">導航</a>
         <button class="visit" type="button"></button>
+        <button class="locate secondary" type="button"></button>
         <button class="share secondary" type="button">分享</button>
         <button class="edit secondary" type="button">編輯</button>
       </div>

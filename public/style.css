@@ -9,6 +9,9 @@
   --border: #e9ecef;
   --star: #f59f00;
   --tabbar-height: 64px;
+  --topbar-height: 48px;
+  --map-top: calc(var(--topbar-height) + env(safe-area-inset-top));
+  --map-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,6 +27,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -68,8 +72,8 @@ label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 .topbar {
   display: flex;
   align-items: center;
-  padding: 10px 16px;
-  padding-top: max(10px, env(safe-area-inset-top));
+  height: var(--map-top);
+  padding: env(safe-area-inset-top) 16px 0;
 }
 .list-name { color: var(--accent); font-weight: 700; text-decoration: none; font-size: 1.1rem; }
 
@@ -118,10 +122,59 @@ body[data-view="me"] .view[data-view="me"] { display: block; }
   box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 }
 
-/* ---- Map placeholder & random pick ---- */
-.map-placeholder { text-align: center; display: grid; gap: 10px; padding-top: 24px; }
+/* ---- Map: fills the space between the top bar and the tab bar; controls float over it ---- */
+/* Google sets position: relative on the map element itself, so the fixed sizing lives on a wrapper. */
+.map-frame { position: fixed; left: 0; right: 0; top: var(--map-top); bottom: var(--map-bottom); pointer-events: none; }
+.map { height: 100%; pointer-events: auto; }
+.map-placeholder { text-align: center; display: grid; gap: 10px; padding-top: 56px; }
 .big-emoji { font-size: 3rem; margin: 0; }
-.map-placeholder .place-list { text-align: left; margin-top: 8px; }
+.map-chips { position: fixed; z-index: 2; top: calc(var(--map-top) + 8px); left: 0; right: 0; padding: 0 12px 6px; }
+.map-chips .chip { box-shadow: 0 1px 4px rgb(0 0 0 / 20%); }
+.map-tools {
+  position: fixed;
+  z-index: 2;
+  right: 12px;
+  bottom: calc(var(--map-bottom) + 12px);
+  display: flex;
+  gap: 8px;
+}
+.map-tools button { width: auto; box-shadow: 0 2px 8px rgb(0 0 0 / 25%); }
+.map-tools .random { padding: 10px 18px; border-radius: 999px; }
+.map-tools .round { width: 48px; padding: 0; border-radius: 50%; background: var(--card); }
+.map-sheet {
+  position: fixed;
+  z-index: 3;
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--map-bottom) + 8px);
+  max-height: 60vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
+}
+.map-sheet:not([hidden]) ~ .map-tools { display: none; }
+#map-card .place { border: none; }
+#map-card .close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 44px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+#map-card .place-head { padding-right: 40px; }
+.drag-bar { padding: 12px 14px; }
+.drag-bar p { margin: 0; }
+.my-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgb(26 115 232 / 25%);
+}
 
 /* ---- List: chips & cards ---- */
 #search { margin-bottom: 10px; }
@@ -210,6 +263,14 @@ dialog h2 { margin: 0 0 12px; font-size: 1.1rem; }
 .rating input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .others { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.9rem; }
 .others:empty { display: none; }
+
+/* ---- 定位 dialog ---- */
+#locate-form { display: grid; gap: 10px; }
+#locate-form .inline-form { margin: 0; }
+.candidates { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.candidates button { display: grid; gap: 2px; text-align: left; }
+.candidates span { color: var(--muted); font-size: 0.85rem; }
+.attribution { font-size: 0.8rem; margin: 0; }
 
 /* ---- Admin / members pages ---- */
 .inline-form { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }

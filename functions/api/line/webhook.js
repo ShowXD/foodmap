@@ -1,4 +1,5 @@
 import { isSocialUrl, fetchCaption, extractPlaces } from '../extract.js';
+import { isSameShop, placeQuery, saveLocation, searchPlaces } from '../../../lib/google.js';
 
 const MAX_LINKS_PER_MESSAGE = 3;
 // Shared with the in-app button's free Workers AI quota; past this, links are saved without AI.
@@ -50,14 +51,27 @@ async function usedLineAiToday(db) {
 
 async function savePlace(db, listId, messageId, url, caption, place = {}) {
   const fields = { name: place.name ?? '', dishes: place.dishes ?? '', area: place.area ?? '', address: place.address ?? '', tags: place.tags ?? '' };
-  await db
+  const saved = await db
     .prepare(
       `INSERT INTO places (list_id, url, caption, name, dishes, area, address, tags, source, line_message_id)
        SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'line', ?9
-       WHERE NOT EXISTS (SELECT 1 FROM places WHERE list_id = ?1 AND url = ?2 AND COALESCE(name, '') = ?4)`,
+       WHERE NOT EXISTS (SELECT 1 FROM places WHERE list_id = ?1 AND url = ?2 AND COALESCE(name, '') = ?4)
+       RETURNING id`,
     )
     .bind(listId, url, caption.slice(0, MAX_CAPTION_LENGTH), fields.name, fields.dishes, fields.area, fields.address, fields.tags, messageId)
-    .run();
+    .first();
+  return saved?.id ?? null;
+}
+
+// Only Google's top hit, and only when its name matches; anything doubtful stays in 待整理 for a person to pick.
+async function locateAutomatically(env, placeId, place) {
+  if (!env.GOOGLE_PLACES_KEY || !placeId || !place.name) return;
+  try {
+    const [best] = await searchPlaces(env.GOOGLE_PLACES_KEY, placeQuery(place));
+    if (best && isSameShop(place.name, best.name)) await saveLocation(env.DB, placeId, best);
+  } catch (error) {
+    console.error('Auto-locate failed', error.message);
+  }
 }
 
 async function collectLinks(env, event) {
@@ -79,7 +93,9 @@ async function collectLinks(env, event) {
     }
     // Never lose a link: if AI found nothing, save the bare link for manual editing.
     if (places.length === 0) await savePlace(env.DB, listId, event.message.id, url, caption);
-    for (const place of places) await savePlace(env.DB, listId, event.message.id, url, caption, place);
+    for (const place of places) {
+      await locateAutomatically(env, await savePlace(env.DB, listId, event.message.id, url, caption, place), place);
+    }
   }
 }
 

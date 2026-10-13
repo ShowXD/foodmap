@@ -40,7 +40,13 @@ CREATE TABLE IF NOT EXISTS places (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   list_id INTEGER REFERENCES lists (id),
   created_by INTEGER REFERENCES users (id),
-  line_message_id TEXT
+  line_message_id TEXT,
+  -- Google's terms: place ID may be kept, lat/lng from Google for at most 30 days (see migrations/0008).
+  google_place_id TEXT,
+  lat REAL,
+  lng REAL,
+  location_source TEXT CHECK (location_source IN ('google', 'manual')),
+  location_fetched_at TEXT
 );
 
 -- LINE groups the bot has been added to. Links are only collected once a site admin
