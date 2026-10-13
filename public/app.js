@@ -62,13 +62,27 @@ async function api(method, body, query = '', path = '/api/places') {
 }
 
 // ---- Views (hash routing keeps the phone's back button working) ----
+let hasShownView = false; // the first render (e.g. opening straight into #add from a share) shouldn't animate
+
 function showView() {
   const view = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'map';
-  document.body.dataset.view = view;
-  for (const tab of document.querySelectorAll('.tabbar a')) {
-    tab.toggleAttribute('aria-current', tab.dataset.tab === view);
+  const previous = document.body.dataset.view;
+  const update = () => {
+    document.body.dataset.view = view;
+    for (const tab of document.querySelectorAll('.tabbar a')) {
+      tab.toggleAttribute('aria-current', tab.dataset.tab === view);
+    }
+    window.scrollTo(0, 0);
+  };
+  // Slide toward the tab that was picked; browsers without View Transitions just switch instantly.
+  const canAnimate = document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (canAnimate && hasShownView && previous !== view) {
+    document.documentElement.dataset.direction = VIEWS.indexOf(view) > VIEWS.indexOf(previous) ? 'forward' : 'back';
+    document.startViewTransition(update);
+  } else {
+    update();
   }
-  window.scrollTo(0, 0);
+  hasShownView = true;
   // Every map created is a billed map load, so only create it once someone actually opens the map.
   if (view === 'map' && !mapReady) {
     mapReady = initMap();

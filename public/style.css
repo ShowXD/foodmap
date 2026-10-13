@@ -85,6 +85,28 @@ body[data-view="add"] .view[data-view="add"],
 body[data-view="me"] .view[data-view="me"] { display: block; }
 .view-title { font-size: 1.15rem; margin: 0 0 12px; }
 
+/* Switching tabs: the page slides while the top bar and tab bar stay put (View Transitions API). */
+main { view-transition-name: page; }
+.topbar { view-transition-name: topbar; }
+.tabbar { view-transition-name: tabbar; }
+::view-transition-old(page),
+::view-transition-new(page) { animation-duration: 220ms; animation-timing-function: ease-out; }
+html[data-direction="forward"]::view-transition-old(page) { animation-name: slide-to-left; }
+html[data-direction="forward"]::view-transition-new(page) { animation-name: slide-from-right; }
+html[data-direction="back"]::view-transition-old(page) { animation-name: slide-to-right; }
+html[data-direction="back"]::view-transition-new(page) { animation-name: slide-from-left; }
+@keyframes slide-to-left { to { transform: translateX(-25%); opacity: 0; } }
+@keyframes slide-from-right { from { transform: translateX(25%); opacity: 0; } }
+@keyframes slide-to-right { to { transform: translateX(25%); opacity: 0; } }
+@keyframes slide-from-left { from { transform: translateX(-25%); opacity: 0; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .map-sheet { animation: sheet-up 200ms ease-out; }
+  dialog[open] { animation: pop-in 160ms ease-out; }
+}
+@keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }
+@keyframes pop-in { from { transform: scale(0.96); opacity: 0; } }
+
 .tabbar {
   position: fixed;
   left: 0;
