@@ -9,8 +9,7 @@
   --border: #e9ecef;
   --star: #f59f00;
   --tabbar-height: 64px;
-  --topbar-height: 48px;
-  --map-top: calc(var(--topbar-height) + env(safe-area-inset-top));
+  --map-top: env(safe-area-inset-top);
   --map-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
 }
 
@@ -68,26 +67,21 @@ label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 .meta { color: var(--muted); font-size: 0.9rem; }
 #list-message, #form-message { color: var(--muted); margin: 8px 0; }
 
-/* ---- App shell: top bar, views, bottom tab bar ---- */
-.topbar {
-  display: flex;
-  align-items: center;
-  height: var(--map-top);
-  padding: env(safe-area-inset-top) 16px 0;
+/* ---- App shell: views and the bottom tab bar (no top bar; content starts below the phone's status bar) ---- */
+body > main {
+  padding-top: calc(env(safe-area-inset-top) + 16px);
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + 24px);
 }
-.list-name { color: var(--accent); font-weight: 700; text-decoration: none; font-size: 1.1rem; }
-
-body > main { padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + 24px); }
 .view { display: none; }
 body[data-view="map"] .view[data-view="map"],
 body[data-view="list"] .view[data-view="list"],
 body[data-view="add"] .view[data-view="add"],
+body[data-view="random"] .view[data-view="random"],
 body[data-view="me"] .view[data-view="me"] { display: block; }
 .view-title { font-size: 1.15rem; margin: 0 0 12px; }
 
 /* Switching tabs: the page slides while the top bar and tab bar stay put (View Transitions API). */
 main { view-transition-name: page; }
-.topbar { view-transition-name: topbar; }
 .tabbar { view-transition-name: tabbar; }
 ::view-transition-old(page),
 ::view-transition-new(page) { animation-duration: 220ms; animation-timing-function: ease-out; }
@@ -114,7 +108,7 @@ html[data-direction="back"]::view-transition-new(page) { animation-name: slide-f
   bottom: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--card);
@@ -152,17 +146,28 @@ html[data-direction="back"]::view-transition-new(page) { animation-name: slide-f
 .big-emoji { font-size: 3rem; margin: 0; }
 .map-chips { position: fixed; z-index: 2; top: calc(var(--map-top) + 8px); left: 0; right: 0; padding: 0 12px 6px; }
 .map-chips .chip { box-shadow: 0 1px 4px rgb(0 0 0 / 20%); }
-.map-tools {
+/* Round white buttons stacked bottom-right, like the Google Maps app. */
+.map-controls {
   position: fixed;
   z-index: 2;
   right: 12px;
-  bottom: calc(var(--map-bottom) + 12px);
-  display: flex;
-  gap: 8px;
+  bottom: calc(var(--map-bottom) + 16px);
+  display: grid;
+  gap: 12px;
 }
-.map-tools button { width: auto; box-shadow: 0 2px 8px rgb(0 0 0 / 25%); }
-.map-tools .random { padding: 10px 18px; border-radius: 999px; }
-.map-tools .round { width: 48px; padding: 0; border-radius: 50%; background: var(--card); }
+.map-button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--card);
+  color: #5f6368;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 30%);
+}
+.map-button svg { width: 24px; height: 24px; }
+#locate-me { color: #1a73e8; }
 .map-sheet {
   position: fixed;
   z-index: 3;
@@ -175,7 +180,7 @@ html[data-direction="back"]::view-transition-new(page) { animation-name: slide-f
   background: var(--card);
   box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
 }
-.map-sheet:not([hidden]) ~ .map-tools { display: none; }
+.map-sheet:not([hidden]) ~ .map-controls { display: none; }
 #map-card .place { border: none; }
 #map-card .close {
   position: absolute;
@@ -285,6 +290,12 @@ dialog h2 { margin: 0 0 12px; font-size: 1.1rem; }
 .rating input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .others { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.9rem; }
 .others:empty { display: none; }
+
+/* ---- 今天吃什麼 ---- */
+.view[data-view="random"] > label { margin-bottom: 12px; }
+.view[data-view="random"] .checkbox-label { font-size: 1rem; color: var(--text); }
+.random-big { margin: 8px 0 4px; min-height: 56px; font-size: 1.15rem; border-radius: 999px; }
+#random-result { margin: 8px 0 12px; }
 
 /* ---- 定位 dialog ---- */
 #locate-form { display: grid; gap: 10px; }

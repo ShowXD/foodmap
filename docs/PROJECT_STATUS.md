@@ -174,6 +174,13 @@
 - `public/style.css`：`::view-transition-old/new(page)` 滑動 220ms；地圖卡片由下滑入、dialog 輕微放大淡入（皆在 `prefers-reduced-motion: no-preference` 內）
 - 驗證：Chrome 手機模擬確認前進／返回兩方向動畫名稱正確，暫停在動畫中途截圖確認地圖（fixed 元素）跟著 main 一起滑入
 
+## 五顆導覽列、地圖按鈕、拿掉頂列（2026-10-13，已本機驗證）
+- 導覽列：地圖／清單／＋（置中）／🎲 吃什麼／我的（`VIEWS` 順序同，切換動畫方向依此）；頂部「我的清單」頂列移除，內容從狀態列下方開始（`env(safe-area-inset-top)`）；目前清單只在「我的」頁切換
+- 地圖右下 Google 風格圓鈕：「顯示全部店家」（依目前篩選 fitBounds）、「回到我的位置」（一直顯示；沒權限時提示到設定開啟）；原地圖上的今天吃什麼按鈕移到獨立分頁
+- 今天吃什麼頁（`#random`）：距離 1／3／5／10 公里／不限、標籤、可勾「也抽我吃過的店」；結果顯示完整卡片＋「在地圖上看」；沒有定位時忽略距離並提示
+- 狀態列顏色：`theme-color` 改為依深淺色模式與 App 背景同色（原本橘色）；manifest `theme_color` 同步
+- 驗證：Chrome 390×844：五顆按鈕中心 39/117/195/273/351（左右對稱）、隨機頁距離與標籤篩選、在地圖上看開卡片
+
 ## API 用量（2026-10-13，已本機驗證；分支 `feature/api-usage`）
 - 做法：App 自己記錄每次對外 API 呼叫（不是讀 Google Cloud Monitoring——那需要 service account 金鑰，使用者若要和帳單完全一致的數字再評估）
 - `migrations/0009_api_usage.sql`＋`schema.sql`：`api_usage(api, day, count)`；`lib/usage.js`：`APIS`（每日上限與 Google Cloud 配額一致：地圖載入 300、地點搜尋 100、座標更新 30；每月免費 10,000／5,000／10,000；AI 擷取每日約 140 次＝10,000 neurons ÷ 約 70，估計值）、`dayIn`（Google 以太平洋時間、Workers AI 以 UTC 計日，與各自配額重置時間一致）、`recordUsage`、`usageReport`（今日、本月、近 30 天補零）

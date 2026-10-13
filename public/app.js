@@ -10,18 +10,18 @@ const listSelect = $('list-select');
 const visitDialog = $('visit-dialog');
 const visitForm = $('visit-form');
 
-const VIEWS = ['map', 'list', 'add', 'me'];
+const VIEWS = ['map', 'list', 'add', 'random', 'me'];
 const LIST_STORAGE_KEY = 'foodmap.list';
 const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'note'];
 
 const TAIWAN = { lat: 23.7, lng: 120.96 };
-const RANDOM_RADIUS_KM = 5;
 
 let lists = [];
 let currentListId = null;
 let places = [];
 let filter = { mode: 'all', tag: null };
 let myPosition = null;
+let locationError = null;
 
 const mapsUrl = (place) => {
   const query = encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '));
@@ -245,6 +245,7 @@ function renderChips() {
 }
 
 function renderPlaces() {
+  renderRandomTags();
   renderChips();
   const shown = places.filter(matchesFilter);
   if (filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
@@ -354,16 +355,25 @@ function renderMarkers() {
   // Frame the shops once per list; after that the map stays where the person moved it.
   if (!hasFittedMap && shown.length) {
     hasFittedMap = true;
-    if (shown.length === 1) {
-      map.setCenter(latLngOf(shown[0]));
-      map.setZoom(15);
-    } else {
-      const bounds = new google.maps.LatLngBounds();
-      for (const place of shown) bounds.extend(latLngOf(place));
-      map.fitBounds(bounds, 48);
-    }
+    fitToPlaces(shown);
   }
 }
+
+function fitToPlaces(shown) {
+  if (shown.length === 1) {
+    map.setCenter(latLngOf(shown[0]));
+    map.setZoom(15);
+    return;
+  }
+  const bounds = new google.maps.LatLngBounds();
+  for (const place of shown) bounds.extend(latLngOf(place));
+  map.fitBounds(bounds, 48);
+}
+
+$('fit-all').addEventListener('click', () => {
+  const shown = places.filter((place) => isLocated(place) && matchesFilter(place));
+  if (map && shown.length) fitToPlaces(shown);
+});
 
 function watchMyPosition() {
   if (!navigator.geolocation) return;
@@ -374,7 +384,10 @@ function watchMyPosition() {
       showMyPosition(isFirstFix);
       if (isFirstFix) renderPlaces(); // distances and the 附近 chip appear
     },
-    (error) => console.warn('Location unavailable', error.message),
+    (error) => {
+      locationError = error;
+      console.warn('Location unavailable', error.message);
+    },
     { enableHighAccuracy: true, maximumAge: 60000 },
   );
 }
@@ -389,7 +402,6 @@ function showMyPosition(shouldCenter) {
   const dot = document.createElement('div');
   dot.className = 'my-dot';
   myMarker = new markerLibrary.AdvancedMarkerElement({ map, position: myPosition, content: dot, title: '我的位置', zIndex: 1000 });
-  $('locate-me').hidden = false;
   if (shouldCenter && !places.some(isLocated)) {
     map.setCenter(myPosition);
     map.setZoom(14);
@@ -397,7 +409,13 @@ function showMyPosition(shouldCenter) {
 }
 
 $('locate-me').addEventListener('click', () => {
-  if (!map || !myPosition) return;
+  if (!myPosition) {
+    alert(locationError?.code === 1
+      ? '沒有定位權限。請到瀏覽器或手機設定，允許這個網站使用位置'
+      : '還在取得你的位置，請稍候再按一次');
+    return;
+  }
+  if (!map) return;
   map.panTo(myPosition);
   map.setZoom(Math.max(map.getZoom(), 15));
 });
@@ -551,16 +569,41 @@ locateDialog.addEventListener('close', () => {
 });
 
 // ---- 今天吃什麼 ----
+const randomTag = $('random-tag');
+const randomMessage = $('random-message');
+let randomPick = null;
+
+function renderRandomTags() {
+  const chosen = randomTag.value;
+  const tags = [...new Set(places.flatMap(tagsOf))].sort();
+  randomTag.replaceChildren(new Option('全部', ''), ...tags.map((tag) => new Option(`#${tag}`, tag)));
+  randomTag.value = tags.includes(chosen) ? chosen : '';
+}
+
 $('random-pick').addEventListener('click', () => {
-  let candidates = places.filter((place) => place.name && !place.my_visited_at && matchesFilter(place));
-  // Prefer somewhere close by; fall back to anywhere when nothing is within reach.
-  const nearby = candidates.filter((place) => (distanceTo(place) ?? Infinity) <= RANDOM_RADIUS_KM);
-  if (nearby.length) candidates = nearby;
+  const radius = Number($('random-radius').value);
+  const includeVisited = $('random-include-visited').checked;
+  let candidates = places.filter((place) => place.name && (includeVisited || !place.my_visited_at) && (!randomTag.value || tagsOf(place).includes(randomTag.value)));
+  const notes = [];
+  if (radius && myPosition) candidates = candidates.filter((place) => (distanceTo(place) ?? Infinity) <= radius);
+  else if (radius) notes.push('還沒取得你的位置，先從所有店家裡抽');
+
   if (!candidates.length) {
-    alert('沒有符合篩選、還沒吃過的店了');
+    randomPick = null;
+    $('random-result').replaceChildren();
+    $('random-on-map').hidden = true;
+    randomMessage.textContent = '沒有符合條件的店，放寬距離或標籤再試試';
     return;
   }
-  focusPlace(candidates[Math.floor(Math.random() * candidates.length)]);
+  randomPick = candidates[Math.floor(Math.random() * candidates.length)];
+  notes.push(`從 ${candidates.length} 家裡抽中：`);
+  randomMessage.textContent = notes.join('。');
+  $('random-result').replaceChildren(renderPlace(randomPick));
+  $('random-on-map').hidden = !isLocated(randomPick);
+});
+
+$('random-on-map').addEventListener('click', () => {
+  if (randomPick) focusPlace(randomPick);
 });
 
 // ---- Add / edit form ----
@@ -735,7 +778,6 @@ function selectList(listId) {
   const list = lists.find((candidate) => candidate.id === listId) ?? lists[0];
   currentListId = list.id;
   listSelect.value = String(list.id);
-  $('current-list-name').textContent = `${list.is_personal ? '👤' : '👥'} ${list.name}`;
   $('members-link').hidden = Boolean(list.is_personal);
   $('members-link').href = `/members?list=${list.id}`;
   $('export-link').href = `/api/export?list=${list.id}`;

@@ -4,7 +4,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fffaf5",
-  "theme_color": "#d9480f",
+  "theme_color": "#fffaf5",
   "share_target": {
     "action": "/",
     "method": "GET",
