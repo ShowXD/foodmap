@@ -183,6 +183,7 @@
 
 ## 開放給朋友使用（2026-10-13 使用者核准計畫；程式已完成並本機驗證，尚未部署）
 - **4. 文件與隱私權頁 ✅**：`docs/setup/cloudflare.md` 新增「開放給朋友」：Access 原則加 Include「登入方法 = Google」（保留 email 那條給驗證碼登入的家人）、**OAuth 同意畫面要從「測試中」改「正式版」**（否則非測試使用者的 Google 帳號會被擋）、Zero Trust 免費 50 人上限、陌生人可在帳號管理停用；選填 secret `LINE_BOT_ID`（加好友連結）；migration 表加 0012。新增 `public/privacy.html`（`/privacy`，「我的」頁有連結）：存了什麼、誰看得到、第三方服務（含 Google 地圖條款連結、座標 30 天規定）、刪除方式
+- **帳號密碼登入（使用者選做法 A，2026-10-13）**：不自建密碼系統，改用 Auth0 免費方案（每月 25,000 位活躍使用者、免信用卡）經 Cloudflare Access「Generic OIDC」接入，程式不用改（App 只讀 Access 的 email）。設定步驟 `docs/setup/password-login.md`；**資安要點**：Auth0 預設未驗證信箱也能登入，必須加 post-login Action `if (!event.user.email_verified) api.access.deny(...)`，否則可冒用他人 email 登進對方帳號。狀態：文件完成，使用者尚未設定、未實測
 - **上線待辦（使用者）**：remote 跑 0012（兩個 CREATE TABLE，用 `--command`）→ `npm run deploy` → Access 原則加 Google → OAuth 同意畫面改正式版 →（選填）`LINE_BOT_ID` → 請一位朋友實測登入、建群組、綁 LINE 群組
 - 決定：共用同一網站（費用在使用者帳上，靠每人每日上限）、任何 Google 帳號可登入、網站管理員維持看得到所有群組、朋友 LINE 群組由群組擁有者用綁定碼自己綁。三個分支：open-groups → per-user-limits → line-bind-code，最後改文件與 Access 原則說明、加隱私權頁
 - **3. 群組擁有者自己綁 LINE 群組 ✅（已本機驗證；未在真實 LINE 群組實測）**：`POST /api/line-bind-code {list_id}`（只限擁有者／管理員，6 碼不含 0/O/1/I，30 分鐘有效、同清單產生新碼會作廢舊碼；有設 `LINE_BOT_ID` 時回傳加好友連結 `https://line.me/R/ti/p/<ID>`）；webhook 收到「綁定 XXXXXX」（大小寫、中間空白皆可）→ 有效碼且該 LINE 群組**尚未綁定**才綁，成功後刪碼（已綁到別的清單不會被搶）；`/api/line-groups?list=ID` 擁有者只看綁到自己群組的、只能解除（`list_id: null`），完整清單仍限管理員。前端：群組成員頁（擁有者）新增「💬 LINE 群組」區：已連結的群組＋解除、產生綁定碼＋三步驟說明、重新整理。驗證：`npm test` 63/63（新 `test/line-bind.test.mjs` 4 項）；本機擁有者頁面顯示已綁群組與綁定碼
@@ -228,6 +229,6 @@
 1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
 3. 使用者照 `docs/setup/line.md` 申請 LINE、設 `LINE_CHANNEL_SECRET`、跑 0006、部署、建 webhook Bypass app、設 Webhook URL、拉 Bot 進群組並在管理頁綁定「家人」，實測擷取品質
-4. 待決：登入是否加密碼方式（使用者保留選擇：A 外接 Auth0 類服務經 Access OIDC／B 自建／C 維持 OTP + Google）
+4. 帳號密碼登入：已決定做法 A（Auth0 經 Access OIDC），使用者照 `docs/setup/password-login.md` 設定後實測（含「未驗證信箱被擋」）
 5. 上線：remote 已有 0007、0008（2026-10-13 查證）；0009 用 `--file` 時遇 `Authentication error [code: 10000]`（匯入 API），已請使用者改用 `--command`；還需 0010、0011（以 `--command` 執行）→ `npm run deploy` → 使用者手機實測地圖、定位、拖曳、Google 搜尋候選、縮圖（真實 IG/FB 是否有 og:image）、Access 是否回傳 name
 6. 階段 C：營業時間／Google 評分（開卡片即時查、每日上限、標示 Google）、使用條款／隱私權頁、影片縮圖（R2，需改 `wrangler.toml`）

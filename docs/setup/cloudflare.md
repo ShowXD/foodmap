@@ -160,6 +160,8 @@ npm run deploy
    - 拿到網址的陌生人也能登入；若發現不認識的帳號，到 App「我的 → 帳號管理」停用。
    - 想回到只限家人：刪掉「登入方法 = Google」那條，OAuth 同意畫面改回測試中。
 
+**帳號密碼登入（選填）**：想讓沒有 Google 帳號的人用 email＋密碼登入，照 [`password-login.md`](password-login.md) 接上 Auth0（免費、程式不用改）。
+
 **LINE 官方帳號 ID（選填）**：朋友綁 LINE 群組時，App 可以直接顯示「加好友」連結。到 LINE Official Account Manager 找到帳號的 Basic ID（像 `@123abcde`），存成 secret：`npx wrangler pages secret put LINE_BOT_ID`。
 
 **驗證**：沒登入時連正式網址、某個版本網址，甚至隨便編一個不存在的子網域（例如 `abc.<專案>.pages.dev`），都應該被導到 `<team>.cloudflareaccess.com` 登入頁。
