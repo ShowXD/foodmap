@@ -181,6 +181,12 @@
 - 狀態列顏色：`theme-color` 改為依深淺色模式與 App 背景同色（原本橘色）；manifest `theme_color` 同步
 - 驗證：Chrome 390×844：五顆按鈕中心 39/117/195/273/351（左右對稱）、隨機頁距離與標籤篩選、在地圖上看開卡片
 
+## 切換分頁時地圖保持繪製（2026-10-13，已本機驗證）
+- 使用者回報切換頁面後地圖「重新抓取」擔心浪費預算。查證：Google Dynamic Maps 的計費事件是「成功的 map load」（建立 `google.maps.Map`），拖曳、縮放、切圖層不另計；本 App 每次開啟只建立一次地圖（`mapReady`），正式環境 `api_usage` 只記到 5 次 map load。看到的「重抓」是地圖頁 `display: none` 後回來從 0 尺寸重繪
+- 修正：其他分頁時地圖頁改為 `position: fixed; visibility: hidden`（保持尺寸與畫面），回到地圖立即顯示
+- 仍會產生新 map load 的情況：重新開啟 App、重新整理、從「群組成員」「網站管理」（獨立頁面）返回
+- 驗證：Chrome 切換 5 次分頁 `/api/config` 只呼叫 1 次、隱藏時地圖仍為 780px 高、清單可點且不被遮擋
+
 ## 個人名稱與大頭貼（2026-10-13，已本機驗證）
 - `migrations/0011_profile.sql`＋`schema.sql`：`users.display_name`；`user_avatars(user_id, content_type, image BLOB, updated_at)` 另開一表（middleware 每次請求都 `SELECT * FROM users`，不要帶圖片）
 - `GET /api/me` 多回 `id`、`name`、`avatarVersion`；`PATCH /api/me {display_name}`（≤30 字，空白＝回預設 email @ 前面）；`PUT /api/avatar`（原始圖片 body，只收 JPEG/PNG/WebP 且檢查檔頭、≤300 KB）、`DELETE /api/avatar`；`GET /avatar/:userId`（登入的家人都能看，`?v=updated_at` 換網址所以可長快取）；`/api/visits` GET 多回 `name`（家人評價顯示名稱）
