@@ -6,10 +6,13 @@ import { createTestDb } from './d1.mjs';
 
 const post = (body) => new Request('http://localhost/api/extract', { method: 'POST', body: JSON.stringify(body) });
 
-test('isSocialUrl only allows IG/FB hosts', () => {
+test('isSocialUrl only allows IG/FB/Threads hosts', () => {
   assert.ok(isSocialUrl('https://www.instagram.com/reel/abc/'));
   assert.ok(isSocialUrl('https://m.facebook.com/watch?v=1'));
   assert.ok(isSocialUrl('https://fb.watch/xyz'));
+  assert.ok(isSocialUrl('https://www.threads.net/@foodie/post/abc'));
+  assert.ok(isSocialUrl('https://www.threads.com/@foodie/post/abc'));
+  assert.ok(!isSocialUrl('https://evilthreads.net/'));
   assert.ok(!isSocialUrl('https://evilinstagram.com/'));
   assert.ok(!isSocialUrl('http://169.254.169.254/latest'));
   assert.ok(!isSocialUrl('javascript:alert(1)'));

@@ -3,7 +3,7 @@ import { isHttpUrl } from './places.js';
 // Free tier: 10,000 neurons/day; one extraction is roughly 70 neurons.
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const MAX_CAPTION_LENGTH = 5000;
-const SOCIAL_HOSTS = ['instagram.com', 'facebook.com', 'fb.watch', 'fb.com'];
+const SOCIAL_HOSTS = ['instagram.com', 'facebook.com', 'fb.watch', 'fb.com', 'threads.net', 'threads.com'];
 const FIELD_NAMES = ['name', 'dishes', 'area', 'address', 'tags'];
 const MAX_PLACES = 10;
 // og tags sit in <head>, so the first 512 KB is plenty and caps memory per request.
