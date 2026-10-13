@@ -129,7 +129,7 @@ body[data-view="me"] .view[data-view="me"] { display: block; }
 .chip {
   width: auto;
   flex: none;
-  min-height: 36px;
+  min-height: 40px;
   padding: 6px 14px;
   border-radius: 999px;
   background: var(--card);
