@@ -39,6 +39,7 @@
     <section class="view" data-view="list" aria-label="清單">
       <div class="list-picker">
         <select id="list-select" aria-label="切換清單"></select>
+        <button id="new-group" type="button" class="icon-button" aria-label="建立群組" title="建立群組">＋</button>
         <a id="members-link" class="icon-button" href="#members" aria-label="群組成員" title="群組成員" hidden>👥</a>
         <a id="export-link" class="icon-button" href="/api/export" download aria-label="匯出這份清單（CSV）" title="匯出 CSV">⬇️</a>
       </div>
@@ -126,6 +127,7 @@
       </form>
       <p id="members-message" role="status">載入中…</p>
       <ul id="member-list" class="user-list"></ul>
+      <button id="leave-group" type="button" class="secondary leave-group" hidden>退出這個群組</button>
     </section>
 
     <!-- Site-admin pages, each opened from its own item on 我的. -->
@@ -195,6 +197,19 @@
         <button value="save">儲存</button>
         <button value="remove" class="secondary" id="visit-remove">取消吃過</button>
         <button value="cancel" class="secondary" formnovalidate>關閉</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="group-dialog">
+    <form method="dialog" id="group-form">
+      <h2>建立群組</h2>
+      <p class="meta">建立後你就是擁有者，可以用 email 邀請朋友加入。群組裡的店大家都看得到，「我的清單」只有你自己看得到。</p>
+      <label>群組名稱 <input name="name" maxlength="50" placeholder="例如：大學同學、公司午餐團"></label>
+      <p id="group-message" class="meta" role="status"></p>
+      <div class="actions">
+        <button value="create">建立</button>
+        <button value="cancel" class="secondary" formnovalidate>取消</button>
       </div>
     </form>
   </dialog>

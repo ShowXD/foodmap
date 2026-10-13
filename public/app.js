@@ -890,12 +890,48 @@ async function loadLists() {
   selectList(readSavedListId());
 }
 
-listSelect.addEventListener('change', () => {
-  selectList(Number(listSelect.value));
+function switchToList(listId) {
+  selectList(listId);
   resetForm();
   hideMapCard();
   hasFittedMap = false;
   loadPlaces({ markRead: true });
+}
+
+listSelect.addEventListener('change', () => switchToList(Number(listSelect.value)));
+
+// ---- Starting a group ----
+const groupDialog = $('group-dialog');
+const groupForm = $('group-form');
+
+$('new-group').addEventListener('click', () => {
+  groupForm.reset();
+  $('group-message').textContent = '';
+  groupDialog.showModal();
+});
+
+groupForm.addEventListener('submit', async (event) => {
+  if (event.submitter?.value !== 'create') return;
+  event.preventDefault(); // keep the dialog open until the group exists
+  const name = groupForm.elements.name.value.trim();
+  if (!name) {
+    $('group-message').textContent = '請輸入群組名稱';
+    return;
+  }
+  try {
+    const group = await api('POST', { name }, '', '/api/lists');
+    groupDialog.close();
+    await loadLists();
+    switchToList(group.id);
+  } catch (error) {
+    $('group-message').textContent = error.message;
+  }
+});
+
+// members.js fires this after someone leaves a group, so the list menu drops it.
+window.addEventListener('foodmap:lists-changed', async () => {
+  await loadLists();
+  switchToList(currentListId);
 });
 
 // ---- Profile: name and photo shown on 我的 and on the tab ----

@@ -47,14 +47,41 @@ test('personal lists stay private, even from site admins', async () => {
   assert.deepEqual(mine.body.map((place) => [place.name, place.created_by]), [['秘密小館', mom.id]]);
 });
 
-test('only site admins create groups; members see the group, outsiders do not', async () => {
+test('anyone can start a group and owns it; only site admins create one for someone else', async () => {
+  const { user, call } = await setup();
+  const friend = await user('friend@example.test');
+  await user('mom@example.test');
+
+  const created = await call(lists.onRequestPost, friend, { method: 'POST', body: { name: '朋友團', owner_email: 'mom@example.test' } });
+  assert.equal(created.status, 201);
+  const [, group] = await myLists(call, friend);
+  assert.deepEqual([group.name, group.is_owner, group.is_member], ['朋友團', 1, 1], 'owner_email is ignored for non-admins');
+
+  for (let index = 2; index <= 10; index++) await call(lists.onRequestPost, friend, { method: 'POST', body: { name: `團 ${index}` } });
+  assert.equal((await call(lists.onRequestPost, friend, { method: 'POST', body: { name: '第 11 團' } })).status, 429);
+});
+
+test('any member may leave a group, but an owner cannot just walk away', async () => {
+  const { user, call } = await setup();
+  const friend = await user('friend@example.test');
+  const pal = await user('pal@example.test');
+  const group = (await call(lists.onRequestPost, friend, { method: 'POST', body: { name: '朋友團' } })).body;
+  await call(members.onRequestPost, friend, { method: 'POST', body: { list_id: group.id, email: 'pal@example.test' } });
+
+  assert.equal((await call(members.onRequestDelete, friend, { method: 'DELETE', body: { list_id: group.id, user_id: friend.id } })).status, 403);
+  assert.equal((await call(members.onRequestDelete, pal, { method: 'DELETE', body: { list_id: group.id, user_id: pal.id } })).status, 200);
+  assert.deepEqual((await myLists(call, pal)).map((list) => list.name), ['我的清單']);
+  const [personal] = await myLists(call, pal);
+  assert.equal((await call(members.onRequestDelete, pal, { method: 'DELETE', body: { list_id: personal.id, user_id: pal.id } })).status, 404, 'personal lists have no members to leave');
+});
+
+test('site admins can create groups for someone else; members see the group, outsiders do not', async () => {
   const { user, call } = await setup();
   const admin = await user('admin@example.test');
   const mom = await user('mom@example.test');
   const kid = await user('kid@example.test');
   const stranger = await user('stranger@example.test');
 
-  assert.equal((await call(lists.onRequestPost, mom, { method: 'POST', body: { name: '我的群組' } })).status, 403);
   assert.equal((await call(lists.onRequestPost, admin, { method: 'POST', body: { name: '家人', owner_email: 'nobody@example.test' } })).status, 404);
   const family = (await call(lists.onRequestPost, admin, { method: 'POST', body: { name: '家人', owner_email: 'MOM@example.test' } })).body;
 

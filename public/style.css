@@ -325,6 +325,10 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 #profile-form { display: grid; gap: 12px; }
 .list-picker { display: flex; gap: 8px; margin-bottom: 10px; }
 .list-picker select { flex: 1; min-width: 0; font-weight: 600; }
+.list-picker .icon-button { padding: 0; color: var(--text); }
+#group-form { display: grid; gap: 12px; }
+#group-form p { margin: 0; }
+.leave-group { margin-top: 16px; }
 .icon-button {
   display: grid;
   place-items: center;

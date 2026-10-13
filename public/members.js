@@ -58,7 +58,25 @@ async function load() {
   document.getElementById('owner-option').hidden = !me.isAdmin;
   message.textContent = `${members.length} 位成員${canManage ? '' : '（只有擁有者能管理成員）'}`;
   memberList.replaceChildren(...members.map((member) => renderMember(member, canManage)));
+  // Owners can't leave (a group must keep its owner); everyone else can.
+  const mine = members.find((member) => member.user_id === me.id);
+  leaveButton.hidden = !mine || Boolean(mine.is_owner);
 }
+
+const leaveButton = document.getElementById('leave-group');
+leaveButton.addEventListener('click', async () => {
+  if (!confirm('確定退出這個群組？之後要請擁有者重新邀請才能回來。')) return;
+  leaveButton.disabled = true;
+  try {
+    await api('DELETE', { list_id: listId, user_id: me.id });
+    window.dispatchEvent(new Event('foodmap:lists-changed'));
+    location.hash = '#list';
+  } catch (error) {
+    message.textContent = `退出失敗：${error.message}`;
+  } finally {
+    leaveButton.disabled = false;
+  }
+});
 
 addForm.addEventListener('submit', async (event) => {
   event.preventDefault();

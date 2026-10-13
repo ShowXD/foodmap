@@ -38,8 +38,12 @@ export async function onRequestPost({ request, env, data }) {
 
 export async function onRequestDelete({ request, env, data }) {
   const body = await request.json().catch(() => null);
-  const list = await findManageableGroup(env.DB, data.user, body?.list_id);
-  if (!list) return notFound();
+  // Any member may leave a group; removing someone else takes an owner or site admin.
+  const isLeaving = body?.user_id === data.user.id;
+  const list = isLeaving
+    ? await findAccessibleList(env.DB, data.user, body.list_id)
+    : await findManageableGroup(env.DB, data.user, body?.list_id);
+  if (!list || list.is_personal) return notFound();
   if (!Number.isInteger(body.user_id)) return json({ error: 'user_id required' }, 400);
 
   const member = await env.DB
