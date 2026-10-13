@@ -169,10 +169,23 @@
   - 驗證：`npm test` 46/46（新 `test/google.test.mjs` 7 項：欄位遮罩、名稱比對、權限 404／未設定 503／配額 429、手動 vs Google 來源、30 天過期不提供、重抓與 404 清除、LINE 自動定位只採名稱相符者）；本機 wrangler（假金鑰）＋Chrome 390×844：無 CSP 違規、地圖區域填滿頂列與導覽列之間、chips 與附近、距離、定位對話框（假金鑰顯示失敗訊息）、從清單「自己在地圖上放」→ 地圖 → 儲存為 manual 並開卡片、今天吃什麼選最近的、卡片不溢出。**未驗證**：真實 Google 地圖畫面、標點點擊、拖曳、Text Search 真實結果（需正式金鑰，限定網域）
   - 未做：Places API 政策要求的使用條款／隱私權頁面（階段 C 前補）
 
+## 切換動畫（2026-10-13，已本機驗證）
+- `public/app.js` `showView`：用 View Transitions API（`document.startViewTransition`），往右邊的分頁滑向左、往左邊的滑向右；頂列與導覽列有自己的 `view-transition-name` 所以不跟著滑；第一次顯示（例如分享直接開 `#add`）不動畫；不支援的瀏覽器或系統設定「減少動態效果」時直接切換
+- `public/style.css`：`::view-transition-old/new(page)` 滑動 220ms；地圖卡片由下滑入、dialog 輕微放大淡入（皆在 `prefers-reduced-motion: no-preference` 內）
+- 驗證：Chrome 手機模擬確認前進／返回兩方向動畫名稱正確，暫停在動畫中途截圖確認地圖（fixed 元素）跟著 main 一起滑入
+
+## API 用量（2026-10-13，已本機驗證；分支 `feature/api-usage`）
+- 做法：App 自己記錄每次對外 API 呼叫（不是讀 Google Cloud Monitoring——那需要 service account 金鑰，使用者若要和帳單完全一致的數字再評估）
+- `migrations/0009_api_usage.sql`＋`schema.sql`：`api_usage(api, day, count)`；`lib/usage.js`：`APIS`（每日上限與 Google Cloud 配額一致：地圖載入 300、地點搜尋 100、座標更新 30；每月免費 10,000／5,000／10,000；AI 擷取每日約 140 次＝10,000 neurons ÷ 約 70，估計值）、`dayIn`（Google 以太平洋時間、Workers AI 以 UTC 計日，與各自配額重置時間一致）、`recordUsage`、`usageReport`（今日、本月、近 30 天補零）
+- 記錄點：`/api/config`（有金鑰時＝一次地圖載入）、`/api/place-search`、LINE 自動定位（地點搜尋）、`refreshStaleLocations`（座標更新）、`/api/extract` 與 LINE（AI 擷取）
+- `GET /api/usage`（只限網站管理員）；`public/admin.html`/`admin.js` 最上方「API 用量」：今日 X / 上限＋剩幾次、進度條（≥80% 變紅）、本月 / 免費額度、近 30 天 SVG 長條圖（今天深色，長按／滑過看次數）
+- 注意：改 Google Cloud 配額時要同步改 `lib/usage.js` 的 `dailyLimit`（已寫進 `docs/setup/google.md`）
+- 驗證：`npm test` 49/49（新 `test/usage.test.mjs` 3 項：時區日界、報表今日／本月／30 天補零、只限管理員與地圖載入計數）；本機 Chrome 390 寬：四張卡片、進度條變紅、長條圖與提示文字、無 console 錯誤、無橫向捲動
+
 ## 下一步
 1. 使用者（進行中）：Access 已合併為**單一應用程式、兩個目的地**（`foodmap-edl.pages.dev` 與 `*.foodmap-edl.pages.dev`），共用原則「foodmap 家人」（Include Emails，目前只有使用者本人，家人 email 之後再加）；2026-10-12 驗證正式網址、版本網址 c62d6197、不存在的子網域皆 302 → blue-mouse-e3db.cloudflareaccess.com；`ACCESS_AUD` 已設定。待確認：`ACCESS_TEAM_DOMAIN`、`ADMIN_EMAILS` 是否已設；remote 依序跑 0002（若尚未）、0003、0004、0005；`npm run deploy`；刪除舊部署
 2. 部署後：管理員到成員頁把自己設為「家人」擁有者、加入家人
 3. 使用者照 `docs/setup/line.md` 申請 LINE、設 `LINE_CHANNEL_SECRET`、跑 0006、部署、建 webhook Bypass app、設 Webhook URL、拉 Bot 進群組並在管理頁綁定「家人」，實測擷取品質
 4. 待決：登入是否加密碼方式（使用者保留選擇：A 外接 Auth0 類服務經 Access OIDC／B 自建／C 維持 OTP + Google）
-5. 階段 B 上線：remote 跑 `migrations/0007_personal.sql`（若尚未）與 `migrations/0008_location.sql` → `npm run deploy` → 使用者手機實測地圖、定位、拖曳、Google 搜尋候選
+5. 上線：remote 依序跑 `migrations/0007_personal.sql`（若尚未）、`0008_location.sql`、`0009_api_usage.sql` → `npm run deploy` → 使用者手機實測地圖、定位、拖曳、Google 搜尋候選
 6. 階段 C：營業時間／Google 評分（開卡片即時查、每日上限、標示 Google）、使用條款／隱私權頁、影片縮圖（R2，需改 `wrangler.toml`）

@@ -17,6 +17,10 @@
   <main>
     <p id="admin-message" role="status">載入中…</p>
 
+    <h2 class="section-title">API 用量</h2>
+    <p class="meta">這是 App 自己記錄的呼叫次數，計費以 Google Cloud 主控台為準。Google 的每日上限是你在 Google Cloud 設的配額，台灣時間下午 3–4 點重置；AI 擷取的上限是依每日免費額度估算，台灣時間早上 8 點重置。</p>
+    <div id="usage-list" class="usage-list"></div>
+
     <h2 class="section-title">群組</h2>
     <form id="create-group-form" class="inline-form">
       <input name="name" required maxlength="50" placeholder="群組名稱，例如：家人" aria-label="群組名稱">

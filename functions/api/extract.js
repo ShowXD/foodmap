@@ -1,4 +1,5 @@
 import { isHttpUrl } from './places.js';
+import { recordUsage } from '../../lib/usage.js';
 
 // Free tier: 10,000 neurons/day; one extraction is roughly 70 neurons.
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
@@ -134,6 +135,7 @@ export async function onRequestPost({ request, env, data }) {
     return json({ error: `今天的 AI 擷取已達 ${DAILY_EXTRACT_LIMIT} 次上限，請手動填寫或明天再試` }, 429);
   }
 
+  await recordUsage(env.DB, 'workers_ai');
   const { places, error } = await extractPlaces(env.AI, caption);
   if (error === 'unavailable') return json({ error: 'AI 暫時無法使用（可能已達今日免費額度），請手動填寫' }, 502);
   if (error === 'unusable') return json({ error: 'AI 回傳格式錯誤，請手動填寫' }, 502);

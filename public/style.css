@@ -295,6 +295,16 @@ dialog h2 { margin: 0 0 12px; font-size: 1.1rem; }
 .attribution { font-size: 0.8rem; margin: 0; }
 
 /* ---- Admin / members pages ---- */
+.usage-list { display: grid; gap: 12px; }
+.usage h3 { margin: 0 0 6px; font-size: 1rem; }
+.usage p { margin: 4px 0; }
+.usage-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.usage-bar span { display: block; height: 100%; background: var(--accent); }
+.usage-bar.near-limit span { background: #e03131; }
+.usage-chart { display: block; width: 100%; height: 64px; margin-top: 10px; }
+.usage-chart rect { fill: var(--accent); opacity: 0.45; }
+.usage-chart rect.today { opacity: 1; }
+.usage-axis { font-size: 0.8rem; }
 .inline-form { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
 .inline-form input { flex: 1; min-width: 160px; }
 .inline-form button { width: auto; white-space: nowrap; }

@@ -1,5 +1,6 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
 import { GoogleQuotaError, placeQuery, searchPlaces } from '../../lib/google.js';
+import { recordUsage } from '../../lib/usage.js';
 
 const MAX_QUERY_LENGTH = 100;
 const json = (body, status = 200) => Response.json(body, { status });
@@ -15,6 +16,7 @@ export async function onRequestPost({ request, env, data }) {
   const query = (typeof body.query === 'string' && body.query.trim() ? body.query : placeQuery(place)).trim().slice(0, MAX_QUERY_LENGTH);
   if (!query) return json({ error: '請先填店名，或輸入要搜尋的文字' }, 400);
   try {
+    await recordUsage(env.DB, 'places_search');
     return json({ query, candidates: await searchPlaces(env.GOOGLE_PLACES_KEY, query) });
   } catch (error) {
     if (error instanceof GoogleQuotaError) return json({ error: '今天的 Google 查詢次數已用完，請明天再試或直接在地圖上放標點' }, 429);

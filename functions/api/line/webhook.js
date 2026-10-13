@@ -1,5 +1,6 @@
 import { isSocialUrl, fetchCaption, extractPlaces } from '../extract.js';
 import { isSameShop, placeQuery, saveLocation, searchPlaces } from '../../../lib/google.js';
+import { recordUsage } from '../../../lib/usage.js';
 
 const MAX_LINKS_PER_MESSAGE = 3;
 // Shared with the in-app button's free Workers AI quota; past this, links are saved without AI.
@@ -67,6 +68,7 @@ async function savePlace(db, listId, messageId, url, caption, place = {}) {
 async function locateAutomatically(env, placeId, place) {
   if (!env.GOOGLE_PLACES_KEY || !placeId || !place.name) return;
   try {
+    await recordUsage(env.DB, 'places_search');
     const [best] = await searchPlaces(env.GOOGLE_PLACES_KEY, placeQuery(place));
     if (best && isSameShop(place.name, best.name)) await saveLocation(env.DB, placeId, best);
   } catch (error) {
@@ -89,6 +91,7 @@ async function collectLinks(env, event) {
     const caption = messageText || (await fetchCaption(url));
     let places = [];
     if (caption && env.AI && (await usedLineAiToday(env.DB)) < LINE_DAILY_AI_LIMIT) {
+      await recordUsage(env.DB, 'workers_ai');
       ({ places = [] } = await extractPlaces(env.AI, caption));
     }
     // Never lose a link: if AI found nothing, save the bare link for manual editing.

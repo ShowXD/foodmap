@@ -127,4 +127,71 @@ createGroupForm.addEventListener('submit', async (event) => {
   }
 });
 
+// ---- API usage ----
+const SVG = 'http://www.w3.org/2000/svg';
+const NEAR_LIMIT = 0.8;
+const formatNumber = (number) => number.toLocaleString('zh-TW');
+
+function svgElement(name, attributes) {
+  const element = document.createElementNS(SVG, name);
+  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+  return element;
+}
+
+// One bar per day for the last 30 days; today is the last bar. Hover/long-press shows the exact count.
+function usageChart(history) {
+  const width = 300;
+  const height = 64;
+  const barWidth = width / history.length;
+  const highest = Math.max(1, ...history.map((entry) => entry.count));
+  const chart = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, class: 'usage-chart', role: 'img', 'aria-label': '近 30 天每日用量' });
+  history.forEach((entry, index) => {
+    const barHeight = entry.count ? Math.max(2, (entry.count / highest) * height) : 0;
+    const bar = svgElement('rect', { x: index * barWidth + 1, y: height - barHeight, width: barWidth - 2, height: barHeight, rx: 1 });
+    if (index === history.length - 1) bar.classList.add('today');
+    const title = svgElement('title', {});
+    title.textContent = `${entry.day}：${formatNumber(entry.count)} 次`;
+    bar.append(title);
+    chart.append(bar);
+  });
+  return { chart, highest };
+}
+
+function renderUsage(entry) {
+  const item = document.createElement('section');
+  item.className = 'usage place';
+  const title = document.createElement('h3');
+  title.textContent = entry.label;
+
+  const remaining = Math.max(0, entry.daily_limit - entry.today);
+  const ratio = Math.min(1, entry.today / entry.daily_limit);
+  const today = document.createElement('p');
+  today.textContent = `今日 ${formatNumber(entry.today)} / ${formatNumber(entry.daily_limit)}，剩 ${formatNumber(remaining)} 次`;
+  const bar = document.createElement('div');
+  bar.className = 'usage-bar';
+  bar.classList.toggle('near-limit', ratio >= NEAR_LIMIT);
+  const fill = document.createElement('span');
+  fill.style.width = `${ratio * 100}%`;
+  bar.append(fill);
+
+  const month = document.createElement('p');
+  month.className = 'meta';
+  month.textContent = entry.monthly_free
+    ? `本月 ${formatNumber(entry.month)} / 免費 ${formatNumber(entry.monthly_free)} 次（剩 ${formatNumber(Math.max(0, entry.monthly_free - entry.month))}）`
+    : `本月 ${formatNumber(entry.month)} 次（每日免費額度，不按月計）`;
+
+  const { chart, highest } = usageChart(entry.history);
+  const axis = document.createElement('p');
+  axis.className = 'meta usage-axis';
+  axis.textContent = `近 30 天（單日最高 ${formatNumber(highest)} 次）`;
+  item.append(title, today, bar, month, chart, axis);
+  return item;
+}
+
+async function loadUsage() {
+  const usage = await api('/api/usage');
+  document.getElementById('usage-list').replaceChildren(...usage.map(renderUsage));
+}
+
 load().catch((error) => { message.textContent = `載入失敗：${error.message}`; });
+loadUsage().catch((error) => { message.textContent = `用量載入失敗：${error.message}`; });

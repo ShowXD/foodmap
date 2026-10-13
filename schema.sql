@@ -92,6 +92,14 @@ CREATE TABLE IF NOT EXISTS extract_usage (
   PRIMARY KEY (user_id, day)
 );
 
+-- Daily call counts per outside API (see lib/usage.js); day is in the timezone the provider resets its quota.
+CREATE TABLE IF NOT EXISTS api_usage (
+  api TEXT NOT NULL,
+  day TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (api, day)
+);
+
 CREATE INDEX IF NOT EXISTS places_url ON places (url);
 CREATE INDEX IF NOT EXISTS places_list ON places (list_id);
 CREATE INDEX IF NOT EXISTS places_line_message ON places (line_message_id);
