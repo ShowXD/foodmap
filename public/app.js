@@ -199,7 +199,7 @@ function renderPlace(place) {
   visit.addEventListener('click', () => openVisitDialog(place));
   const locate = card.querySelector('.locate');
   locate.textContent = isLocated(place) ? '修正位置' : '📍 定位';
-  locate.addEventListener('click', () => (isLocated(place) ? startDrag(place) : openLocateDialog(place)));
+  locate.addEventListener('click', () => openLocateDialog(place));
   card.querySelector('.share').addEventListener('click', () => sharePlace(place));
   card.querySelector('.edit').addEventListener('click', () => startEdit(place));
   return card;
@@ -584,14 +584,23 @@ const locateForm = $('locate-form');
 const locateMessage = $('locate-message');
 let locatingPlace = null;
 
+// First time: search Google by the shop name right away. Fixing a position: wait for the person to type the
+// exact address (no search spent until they press 搜尋); dragging the pin stays available as a fallback.
 function openLocateDialog(place) {
   locatingPlace = place;
-  $('locate-title').textContent = `${place.name || '這家店'}在哪裡？`;
-  locateForm.elements.query.value = '';
+  const isFixing = isLocated(place);
+  $('locate-title').textContent = isFixing ? `修正「${place.name || '這家店'}」的位置` : `${place.name || '這家店'}在哪裡？`;
+  locateForm.elements.query.value = isFixing ? place.address ?? '' : '';
   $('locate-candidates').replaceChildren();
   locateDialog.showModal();
-  if (place.name) searchLocation();
-  else locateMessage.textContent = '還沒有店名，請輸入要搜尋的文字';
+  if (isFixing) {
+    locateMessage.textContent = '輸入完整地址（例如：台北市大安區復興南路一段 1 號）或店名，再按搜尋';
+    locateForm.elements.query.focus();
+  } else if (place.name) {
+    searchLocation();
+  } else {
+    locateMessage.textContent = '還沒有店名，請輸入店名或完整地址';
+  }
 }
 
 async function searchLocation() {
