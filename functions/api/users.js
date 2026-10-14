@@ -5,8 +5,14 @@ const forbidden = () => json({ error: 'admin only' }, 403);
 
 export async function onRequestGet({ env, data }) {
   if (!data.user.is_admin) return forbidden();
+  // Every registered account with the groups it is in, so the admin can add people to groups from here.
   const { results } = await env.DB
-    .prepare("SELECT id, email, status, is_admin, created_at FROM users ORDER BY status = 'pending' DESC, created_at")
+    .prepare(
+      `SELECT u.id, u.email, u.display_name, u.status, u.is_admin, u.created_at,
+              (SELECT group_concat(m.list_id) FROM list_members m WHERE m.user_id = u.id) AS group_ids,
+              (SELECT group_concat(l.name, '、') FROM list_members m JOIN lists l ON l.id = m.list_id WHERE m.user_id = u.id) AS group_names
+       FROM users u ORDER BY u.status = 'pending' DESC, u.created_at`,
+    )
     .all();
   return json(results);
 }

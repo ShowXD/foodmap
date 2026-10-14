@@ -5,6 +5,7 @@ import { ensureUser } from '../lib/users.js';
 import * as places from '../functions/api/places.js';
 import * as lists from '../functions/api/lists.js';
 import * as members from '../functions/api/list-members.js';
+import * as users from '../functions/api/users.js';
 
 const ENV = { ADMIN_EMAILS: 'admin@example.test' };
 
@@ -122,6 +123,23 @@ test('members cannot manage the group; owners cannot be removed except by a site
   assert.equal((await call(members.onRequestDelete, mom, { method: 'DELETE', body: { list_id: family.id, user_id: kid.id } })).status, 200);
   assert.equal((await call(places.onRequestGet, kid, { query: `?list=${family.id}` })).status, 404);
   assert.equal((await call(members.onRequestDelete, admin, { method: 'DELETE', body: { list_id: family.id, user_id: mom.id } })).status, 200);
+});
+
+test('site admins see every account with its groups and can add anyone to any group', async () => {
+  const { user, call } = await setup();
+  const admin = await user('admin@example.test');
+  const friend = await user('friend@example.test');
+  const group = (await call(lists.onRequestPost, friend, { method: 'POST', body: { name: '朋友團' } })).body;
+  await user('newbie@example.test');
+
+  assert.equal((await call(users.onRequestGet, friend)).status, 403);
+  assert.equal((await call(members.onRequestPost, admin, { method: 'POST', body: { list_id: group.id, email: 'newbie@example.test' } })).status, 201);
+  const accounts = (await call(users.onRequestGet, admin)).body;
+  assert.deepEqual(accounts.map((account) => [account.email, account.group_names]), [
+    ['admin@example.test', null],
+    ['friend@example.test', '朋友團'],
+    ['newbie@example.test', '朋友團'],
+  ]);
 });
 
 test('only site admins can make someone a group owner', async () => {

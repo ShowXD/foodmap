@@ -78,6 +78,31 @@ function renderLineGroups(lineGroups, groupLists) {
   }));
 }
 
+// A group picker plus「加入群組」for one account (site admins may add anyone to any group).
+function addToGroupControl(user, joinable) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'add-to-group';
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', `把 ${user.email} 加入群組`);
+  select.append(...joinable.map((group) => new Option(`👥 ${group.name}`, group.id)));
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = '加入群組';
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await api('/api/list-members', 'POST', { list_id: Number(select.value), email: user.email });
+      await load();
+      message.textContent = `已把 ${user.display_name || user.email} 加入「${select.selectedOptions[0].text.replace('👥 ', '')}」`;
+    } catch (error) {
+      message.textContent = `加入失敗：${error.message}`;
+      button.disabled = false;
+    }
+  });
+  wrapper.append(select, button);
+  return wrapper;
+}
+
 async function load() {
   const me = await api('/api/me');
   if (!me.isAdmin) {
@@ -97,10 +122,19 @@ async function load() {
     return item;
   }));
 
+  const groups = lists.filter((list) => !list.is_personal);
   userList.replaceChildren(...users.map((user) => {
     const isMe = user.email === me.email;
     const status = user.status === 'disabled' ? '已停用' : '可使用';
-    const { item, actions } = card(user.email + (isMe ? '（你）' : ''), `${status}${user.is_admin ? ' · 網站管理員' : ''} · 首次登入 ${user.created_at} (UTC)`);
+    const title = `${user.display_name ? `${user.display_name}・` : ''}${user.email}${isMe ? '（你）' : ''}`;
+    const { item, actions } = card(title, `${status}${user.is_admin ? ' · 網站管理員' : ''} · 首次登入 ${user.created_at} (UTC)`);
+    const memberships = document.createElement('p');
+    memberships.className = 'meta';
+    memberships.textContent = `群組：${user.group_names || '（還沒加入任何群組）'}`;
+    item.insertBefore(memberships, actions);
+
+    const joinable = groups.filter((group) => !String(user.group_ids ?? '').split(',').includes(String(group.id)));
+    if (joinable.length) actions.append(addToGroupControl(user, joinable));
     if (!isMe) {
       actions.append(user.status === 'disabled' ? userButton('恢復', { status: 'approved' }, user) : userButton('停用', { status: 'disabled' }, user));
       actions.append(userButton(user.is_admin ? '取消網站管理員' : '設為網站管理員', { is_admin: !user.is_admin }, user));

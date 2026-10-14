@@ -329,6 +329,9 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 .identity-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
 .identity-email { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .identity-list button { width: auto; min-height: 36px; padding: 6px 12px; }
+.add-to-group { display: flex; gap: 8px; flex: 1 1 100%; }
+.add-to-group select { flex: 1; min-width: 0; }
+.add-to-group button { width: auto; white-space: nowrap; }
 .list-picker { display: flex; gap: 8px; margin-bottom: 10px; }
 .list-picker select { flex: 1; min-width: 0; font-weight: 600; }
 .list-picker .icon-button { padding: 0; color: var(--text); }
