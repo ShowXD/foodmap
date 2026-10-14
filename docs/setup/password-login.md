@@ -97,6 +97,23 @@ exports.onExecutePostLogin = async (event, api) => {
 2. **Access 控制** → **原則** → `foodmap 家人`：在包含（Include）**新增一條**：**登入方法（Login Methods）** = **帳號密碼**。
    - 原本的「電子郵件」「登入方法 = Google」照舊保留，Include 之間是「或」。
 
+## 6.5 指紋／臉部辨識登入（Passkey，選做）
+
+> 查證：[Auth0 Passkey 設定](https://auth0.com/docs/authenticate/database-connections/passkeys/configure-passkey-policy)（2026-10-14）。免費方案包含 Passkey。
+
+先確認 Auth0 的前置條件：
+
+- **Authentication** → **Authentication Profile**：選 **Identifier First**（先輸入 email、再輸入密碼）。
+- **Branding** → **Universal Login**：使用新版 Universal Login，且「Custom Login Page」關閉。
+- 資料庫連線不要求「username」（預設就不要求）。
+
+開啟：**Authentication** → **Database** → **Username-Password-Authentication** → **Authentication Methods** → **Passkey** → **Configure** → 開啟並保持：
+
+- **Progressive Enrollment** 勾選：用密碼登入後會詢問「要不要建立 passkey」。**按略過的話，30 天後會再詢問**，所以拒絕過的人之後仍然能開啟。
+- **Local Enrollment** 勾選：換新手機時會詢問是否在那台手機也建立。
+
+Google 登入的人不經過 Auth0；他們可以到自己的 Google 帳號設定「密碼金鑰」，登入 Google 時就是按指紋。
+
 ## 7. 實測
 
 1. 用無痕視窗打開 App → 登入頁會多一個「帳號密碼」按鈕。
@@ -107,6 +124,10 @@ exports.onExecutePostLogin = async (event, api) => {
 ## 給朋友的使用說明（可以直接轉貼）
 
 > 打開美食地圖網址 → 選「帳號密碼」→ 第一次按 **Sign up**，用 email 和密碼註冊 → 到信箱點驗證信 → 回來登入。忘記密碼就按 **Forgot password?**。有 Google 帳號的話直接按 Google 登入也可以。
+
+## 不同 email 的登入方式綁成同一個人
+
+同一個 email 用哪種方式登入都是同一個人。如果有人的密碼帳號和 Google 帳號 email 不同，在 App「我的 → 登入方式 → 綁定其他登入方式」：App 會先登出，請他在 10 分鐘內用另一個帳號登入，回來就綁好了。已經有自己資料的帳號不能綁（請管理員處理）；綁定可在同一處解除。
 
 ## 注意事項
 

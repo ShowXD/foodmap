@@ -1,3 +1,4 @@
+import { findUserByEmail } from '../../lib/users.js';
 import { accessibleLists, ensurePersonalList } from '../../lib/lists.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
@@ -19,7 +20,7 @@ export async function onRequestPost({ request, env, data }) {
   const ownerEmail = data.user.is_admin && typeof body?.owner_email === 'string' ? body.owner_email.trim().toLowerCase() : '';
   if (!name || name.length > 50) return json({ error: '群組名稱必填，最多 50 字' }, 400);
 
-  const owner = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(ownerEmail || data.user.email).first();
+  const owner = await findUserByEmail(env.DB, ownerEmail || data.user.email);
   if (!owner) return json({ error: '找不到這個 email，對方要先登入過一次' }, 404);
   if (!data.user.is_admin) {
     const owned = await env.DB.prepare('SELECT COUNT(*) AS n FROM list_members WHERE user_id = ? AND is_owner = 1').bind(owner.id).first();

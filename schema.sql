@@ -109,6 +109,20 @@ CREATE TABLE IF NOT EXISTS place_thumbnails (
   fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Extra sign-in emails linked to an account (e.g. a Google login with a different address); users.email is the main one.
+CREATE TABLE IF NOT EXISTS user_identities (
+  email TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- A link started on 我的 waits here (token stored as a SHA-256 hash) until the other login comes back.
+CREATE TABLE IF NOT EXISTS link_requests (
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL
+);
+
 -- Per-person daily counts for APIs that have a per-person limit (see lib/usage.js APIS.perUserDaily).
 CREATE TABLE IF NOT EXISTS user_daily_usage (
   user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,

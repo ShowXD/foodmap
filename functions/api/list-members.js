@@ -1,3 +1,4 @@
+import { findUserByEmail } from '../../lib/users.js';
 import { findAccessibleList, findManageableGroup } from '../../lib/lists.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
@@ -23,7 +24,7 @@ export async function onRequestPost({ request, env, data }) {
   const list = await findManageableGroup(env.DB, data.user, body?.list_id);
   if (!list) return notFound();
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const user = await env.DB.prepare('SELECT id, email FROM users WHERE email = ?').bind(email).first();
+  const user = await findUserByEmail(env.DB, email);
   if (!user) return json({ error: '找不到這個 email，請對方先登入美食地圖一次' }, 404);
   // Only site admins hand out ownership.
   const isOwner = body.is_owner === true && data.user.is_admin ? 1 : 0;

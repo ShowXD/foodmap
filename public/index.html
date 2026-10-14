@@ -109,6 +109,13 @@
         <button id="edit-profile" type="button" class="secondary edit-profile">編輯</button>
       </div>
       <input id="avatar-file" type="file" accept="image/*" aria-label="選擇大頭貼照片" hidden>
+      <section class="login-methods" aria-label="登入方式">
+        <h2 class="section-title">登入方式</h2>
+        <ul id="identity-list" class="identity-list"></ul>
+        <button id="link-account" type="button" class="secondary">＋ 綁定其他登入方式</button>
+        <p class="meta">綁定後，用其中任何一個登入都是同一個帳號、同一份資料。</p>
+        <p class="meta">🫆 指紋／臉部辨識：用「帳號密碼」登入時會詢問要不要建立；略過的話 30 天後會再問一次。用 Google 登入的人，可以到 Google 帳號設定「密碼金鑰」。</p>
+      </section>
       <nav class="menu">
         <a class="admin-only" href="#usage" hidden>📊 API 用量</a>
         <a class="admin-only" href="#groups" hidden>🏠 群組管理</a>

@@ -1044,10 +1044,70 @@ profileDialog.addEventListener('close', async () => {
   }
 });
 
+// ---- Sign-in methods linked to this account (see lib/links.js) ----
+const LINK_RESULTS = {
+  linked: '綁定完成！之後用這個登入方式，也會進到同一個帳號。',
+  taken: '這個帳號已經有自己的資料，沒辦法綁定。你現在是用它登入的；要合併兩個帳號請聯絡網站管理員。',
+  expired: '綁定逾時或已經用過了，請到「我的」重新按一次「綁定其他登入方式」。',
+};
+
+async function loadIdentities() {
+  const identities = await api('GET', null, '', '/api/link');
+  $('identity-list').replaceChildren(...identities.map((identity) => {
+    const item = document.createElement('li');
+    const email = document.createElement('span');
+    email.className = 'identity-email';
+    email.textContent = identity.email;
+    const tags = document.createElement('span');
+    tags.className = 'meta';
+    tags.textContent = [identity.is_main && '主要', identity.is_current && '目前使用中'].filter(Boolean).join('・');
+    item.append(email, tags);
+    if (!identity.is_main && !identity.is_current) {
+      const unlink = document.createElement('button');
+      unlink.type = 'button';
+      unlink.className = 'secondary';
+      unlink.textContent = '解除';
+      unlink.addEventListener('click', async () => {
+        if (!confirm(`解除後，用 ${identity.email} 登入會變成另一個新帳號。確定？`)) return;
+        try {
+          await api('DELETE', { email: identity.email }, '', '/api/link');
+          await loadIdentities();
+        } catch (error) {
+          alert(`解除失敗：${error.message}`);
+        }
+      });
+      item.append(unlink);
+    }
+    return item;
+  }));
+}
+
+$('link-account').addEventListener('click', async () => {
+  const steps = '接下來會先登出。\n\n請在登入頁選擇「要綁定的那個帳號」登入（例如 Google），並在 10 分鐘內完成。\n回到美食地圖後就會看到結果。';
+  if (!confirm(steps)) return;
+  try {
+    await api('POST', null, '', '/api/link');
+    location.href = '/cdn-cgi/access/logout';
+  } catch (error) {
+    alert(`無法開始綁定：${error.message}`);
+  }
+});
+
+// The middleware leaves the outcome in a short-lived cookie after the other account signs in.
+function showLinkResult() {
+  const outcome = document.cookie.split(/;\s*/).find((pair) => pair.startsWith('foodmap_link_result='))?.split('=')[1];
+  if (!outcome) return;
+  document.cookie = 'foodmap_link_result=; Path=/; Max-Age=0; Secure; SameSite=Lax';
+  location.hash = '#me';
+  alert(LINK_RESULTS[outcome] ?? LINK_RESULTS.expired);
+}
+
 api('GET', null, '', '/api/me')
   .then(async (me) => {
     profile = me;
     applyProfile();
+    showLinkResult();
+    loadIdentities().catch((error) => console.error('Failed to load sign-in methods', error));
     if (!profile.name) {
       const name = await nameFromSignIn();
       if (name) await saveName(name);

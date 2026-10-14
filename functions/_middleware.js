@@ -1,5 +1,6 @@
 import { verifyAccessJwt } from '../lib/access.js';
 import { ensureUser } from '../lib/users.js';
+import { LINK_COOKIE, clearLinkCookie, completeLink, linkResultCookie, readCookie } from '../lib/links.js';
 
 // The LINE webhook can't log in; it authenticates with the x-line-signature header instead.
 const PUBLIC_PATHS = new Set(['/api/line/webhook']);
@@ -66,8 +67,14 @@ async function handle(context, pathname) {
   const email = await authenticatedEmail(request, env);
   if (!email) return new Response('需要透過 Cloudflare Access 登入', { status: 401 });
 
+  // Coming back from signing in with another account to link it (see lib/links.js).
+  const linkToken = readCookie(request, LINK_COOKIE);
+  const linkOutcome = linkToken ? await completeLink(env.DB, email, linkToken) : null;
+  if (linkOutcome) data.setCookies = [clearLinkCookie(), linkResultCookie(linkOutcome)];
+
   const user = await ensureUser(env.DB, email, env);
   data.user = user;
+  data.loginEmail = email;
   if (user.status === 'approved' || WAITING_PATHS.has(pathname)) return next();
 
   if (pathname.startsWith('/api/')) return Response.json({ error: 'account disabled', status: user.status }, { status: 403 });
@@ -76,5 +83,7 @@ async function handle(context, pathname) {
 
 export async function onRequest(context) {
   const { pathname } = new URL(context.request.url);
-  return withSecurityHeaders(await handle(context, pathname), pathname);
+  const response = withSecurityHeaders(await handle(context, pathname), pathname);
+  for (const cookie of context.data.setCookies ?? []) response.headers.append('Set-Cookie', cookie);
+  return response;
 }
