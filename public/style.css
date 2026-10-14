@@ -199,6 +199,52 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 #map-card .place-head { padding-right: 40px; }
 .drag-bar { padding: 12px 14px; }
 .drag-bar p { margin: 0; }
+/* Pin styles other than Google's own pin (chosen on 我的). Markers anchor at their bottom centre. */
+.map-marker { position: relative; box-sizing: border-box; border: 2px solid #fff; background: var(--marker-color); box-shadow: 0 1px 4px rgb(0 0 0 / 40%); }
+.map-marker.dot {
+  width: calc(16px * var(--marker-scale, 1));
+  height: calc(16px * var(--marker-scale, 1));
+  border-radius: 50%;
+  transform: translateY(50%); /* puts the dot's centre, not its bottom, on the spot */
+}
+.map-marker.food {
+  display: grid;
+  place-items: center;
+  width: calc(34px * var(--marker-scale, 1));
+  height: calc(34px * var(--marker-scale, 1));
+  margin-bottom: 7px; /* room for the tip below */
+  border: 3px solid var(--marker-color);
+  border-radius: 50%;
+  background: #fff;
+  font-size: calc(17px * var(--marker-scale, 1));
+  line-height: 1;
+}
+.map-marker.food::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--marker-color);
+  border-bottom-width: 0;
+}
+.marker-with-name { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.marker-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 90%);
+  color: #212529;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+}
+.pin-settings label { margin: 10px 0; }
+.pin-settings .checkbox-label { font-size: 0.95rem; color: var(--text); }
 .my-dot {
   width: 18px;
   height: 18px;

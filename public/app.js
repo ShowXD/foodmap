@@ -416,25 +416,57 @@ async function initMap() {
 const latLngOf = (place) => ({ lat: place.lat, lng: place.lng });
 const PIN_COLORS = { starred: ['#f59f00', '#b37400'], visited: ['#adb5bd', '#868e96'], todo: ['#d9480f', '#a8380b'] };
 
+// Pin look chosen on 我的 (kept per device); colours always mean 未吃／吃過／想吃.
+const PIN_STYLE_KEY = 'foodmap.pinStyle';
+const PIN_SCALES = { s: 0.8, m: 1, l: 1.3 };
+let pinStyle = { shape: 'pin', size: 'm', showName: false };
+try {
+  pinStyle = { ...pinStyle, ...JSON.parse(localStorage.getItem(PIN_STYLE_KEY) ?? '{}') };
+} catch {
+  // Unreadable or blocked storage: keep the defaults.
+}
+
 function pinFor(place) {
   const [background, borderColor] = PIN_COLORS[place.starred ? 'starred' : place.my_visited_at ? 'visited' : 'todo'];
-  return new markerLibrary.PinElement({ background, borderColor, glyphColor: '#fff' });
+  const scale = PIN_SCALES[pinStyle.size] ?? 1;
+  let pin;
+  if (pinStyle.shape === 'pin') {
+    pin = new markerLibrary.PinElement({ background, borderColor, glyphColor: '#fff', scale });
+  } else {
+    pin = document.createElement('div');
+    pin.className = `map-marker ${pinStyle.shape === 'food' ? 'food' : 'dot'}`;
+    pin.style.setProperty('--marker-color', background);
+    pin.style.setProperty('--marker-border', borderColor);
+    pin.style.setProperty('--marker-scale', String(scale));
+    if (pinStyle.shape === 'food') pin.textContent = '🍜';
+  }
+  if (!pinStyle.showName || !place.name) return pin;
+  // The marker is anchored at its bottom centre, so the name goes above the pin to keep the tip on the spot.
+  const labelled = document.createElement('div');
+  labelled.className = 'marker-with-name';
+  const name = document.createElement('span');
+  name.className = 'marker-name';
+  name.textContent = place.name;
+  labelled.append(name, pin);
+  return labelled;
 }
 
 function renderMarkers() {
   if (!map) return;
   for (const marker of markers) marker.map = null;
   const shown = places.filter((place) => isLocated(place) && matchesFilter(place) && place.id !== draggingPlace?.id);
+  // The map opens on the person's own position (showMyPosition); framing all the shops is the fallback
+  // only when that position won't come (denied or unsupported). After that the map stays where they moved it.
+  // Done before drawing markers so the view is right even if drawing one fails.
+  if (!hasFittedMap && shown.length && (locationError || !navigator.geolocation)) {
+    hasFittedMap = true;
+    fitToPlaces(shown);
+  }
   markers = shown.map((place) => {
     const marker = new markerLibrary.AdvancedMarkerElement({ map, position: latLngOf(place), title: place.name || '', content: pinFor(place), gmpClickable: true });
     marker.addEventListener('gmp-click', () => showMapCard(place));
     return marker;
   });
-  // Frame the shops once per list; after that the map stays where the person moved it.
-  if (!hasFittedMap && shown.length) {
-    hasFittedMap = true;
-    fitToPlaces(shown);
-  }
 }
 
 function fitToPlaces(shown) {
@@ -465,6 +497,7 @@ function watchMyPosition() {
     (error) => {
       locationError = error;
       console.warn('Location unavailable', error.message);
+      if (map && !hasFittedMap) renderMarkers(); // no position coming: show all the shops instead
     },
     { enableHighAccuracy: true, maximumAge: 60000 },
   );
@@ -480,9 +513,10 @@ function showMyPosition(shouldCenter) {
   const dot = document.createElement('div');
   dot.className = 'my-dot';
   myMarker = new markerLibrary.AdvancedMarkerElement({ map, position: myPosition, content: dot, title: '我的位置', zIndex: 1000 });
-  if (shouldCenter && !places.some(isLocated)) {
+  if (shouldCenter) {
     map.setCenter(myPosition);
-    map.setZoom(14);
+    map.setZoom(15);
+    hasFittedMap = true;
   }
 }
 
@@ -1052,6 +1086,21 @@ profileDialog.addEventListener('close', async () => {
     alert(`儲存失敗：${error.message}`);
   }
 });
+
+// ---- Pin style setting (see pinFor) ----
+const pinShapeSelect = $('pin-shape');
+const pinSizeSelect = $('pin-size');
+const pinShowName = $('pin-show-name');
+pinShapeSelect.value = pinStyle.shape;
+pinSizeSelect.value = pinStyle.size;
+pinShowName.checked = Boolean(pinStyle.showName);
+
+function savePinStyle() {
+  pinStyle = { shape: pinShapeSelect.value, size: pinSizeSelect.value, showName: pinShowName.checked };
+  saveSetting(PIN_STYLE_KEY, JSON.stringify(pinStyle));
+  renderMarkers();
+}
+for (const control of [pinShapeSelect, pinSizeSelect, pinShowName]) control.addEventListener('change', savePinStyle);
 
 // ---- Sign-in methods linked to this account (see lib/links.js) ----
 const LINK_RESULTS = {

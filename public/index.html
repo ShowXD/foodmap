@@ -116,6 +116,25 @@
         <p class="meta">綁定後，用其中任何一個登入都是同一個帳號、同一份資料。</p>
         <p class="meta">🫆 指紋／臉部辨識：用「帳號密碼」登入時會詢問要不要建立；略過的話 30 天後會再問一次。用 Google 登入的人，可以到 Google 帳號設定「密碼金鑰」。</p>
       </section>
+      <section class="pin-settings" aria-label="地圖圖釘">
+        <h2 class="section-title">地圖圖釘</h2>
+        <label>樣式
+          <select id="pin-shape">
+            <option value="pin">圖釘</option>
+            <option value="dot">圓點（店多時比較清爽）</option>
+            <option value="food">美食圖示 🍜</option>
+          </select>
+        </label>
+        <label>大小
+          <select id="pin-size">
+            <option value="s">小</option>
+            <option value="m">中</option>
+            <option value="l">大</option>
+          </select>
+        </label>
+        <label class="checkbox-label"><input id="pin-show-name" type="checkbox"> 在圖釘上顯示店名</label>
+        <p class="meta">顏色：橘＝還沒吃、灰＝我吃過、金＝想吃。設定只套用在這支手機。</p>
+      </section>
       <nav class="menu">
         <a class="admin-only" href="#usage" hidden>📊 API 用量</a>
         <a class="admin-only" href="#groups" hidden>🏠 群組管理</a>
