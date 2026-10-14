@@ -511,6 +511,7 @@ function watchMyPosition() {
     (position) => {
       const isFirstFix = !myPosition;
       myPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
+      myAccuracy = position.coords.accuracy;
       showMyPosition(isFirstFix);
       if (isFirstFix) renderPlaces(); // distances and the 附近 chip appear
     },
@@ -519,26 +520,44 @@ function watchMyPosition() {
       console.warn('Location unavailable', error.message);
       if (map && !hasFittedMap) renderMarkers(); // no position coming: show all the shops instead
     },
-    { enableHighAccuracy: true, maximumAge: 60000 },
+    // maximumAge 0: a cached fix can be a coarse network guess from elsewhere.
+    { enableHighAccuracy: true, maximumAge: 0 },
   );
 }
+
+let myAccuracy = null; // metres, as reported by the browser
+let accuracyCircle = null;
+// The fix the map was auto-centred on; later, sharper fixes re-centre only while the map hasn't been moved since.
+let centeredOn = null;
 
 // Runs on every location fix and once the map is ready, whichever comes last draws the dot.
 function showMyPosition(shouldCenter) {
   if (!map || !myPosition) return;
+  accuracyCircle ??= new google.maps.Circle({ map, clickable: false, strokeWeight: 0, fillColor: '#1a73e8', fillOpacity: 0.12 });
+  accuracyCircle.setOptions({ center: myPosition, radius: myAccuracy ?? 0 });
   if (myMarker) {
     myMarker.position = myPosition;
     renderRadius();
+    const center = map.getCenter();
+    const isUntouched = centeredOn && center
+      && Math.abs(center.lat() - centeredOn.lat) < 1e-6 && Math.abs(center.lng() - centeredOn.lng) < 1e-6;
+    if (isUntouched && myAccuracy < centeredOn.accuracy / 2) centerOnMe();
     return;
   }
   const dot = document.createElement('div');
   dot.className = 'my-dot';
   myMarker = new markerLibrary.AdvancedMarkerElement({ map, position: myPosition, content: dot, title: '我的位置', zIndex: 1000 });
   if (shouldCenter) {
-    map.setCenter(myPosition);
+    centerOnMe();
     map.setZoom(15);
     hasFittedMap = true;
   }
+}
+
+function centerOnMe() {
+  map.setCenter(myPosition);
+  const center = map.getCenter();
+  centeredOn = { lat: center.lat(), lng: center.lng(), accuracy: myAccuracy ?? Infinity };
 }
 
 $('locate-me').addEventListener('click', () => {
@@ -551,6 +570,10 @@ $('locate-me').addEventListener('click', () => {
   if (!map) return;
   map.panTo(myPosition);
   map.setZoom(Math.max(map.getZoom(), 15));
+  // Android lets people grant only "approximate" location, which is off by a kilometre or more.
+  if (myAccuracy > 500) {
+    alert(`目前只取得大概位置（誤差約 ${formatDistance(myAccuracy / 1000)}）。請到手機的「設定 → 位置 → 應用程式位置權限 → Chrome」開啟「使用精確位置」，並確認 GPS 已開啟`);
+  }
 });
 
 function showMapCard(place) {
