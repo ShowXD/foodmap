@@ -289,6 +289,7 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0010_thumbnails.sql` | 影片縮圖（存 IG/FB 的預覽圖） | 還沒有 `place_thumbnails` 表的資料庫 |
 | `0011_profile.sql` | 個人名稱與大頭貼 | `users` 還沒有 `display_name` 欄位的資料庫 |
 | `0012_friends.sql` | 每人每日用量上限、LINE 群組綁定碼 | 還沒有 `user_daily_usage` 表的資料庫 |
+| `0013_identities.sql` | 不同 email 的登入方式綁成同一個帳號 | 還沒有 `user_identities` 表的資料庫 |
 
 > 若 `--file` 出現 `Authentication error [code: 10000]`（匯入 API 的權限問題），改用 `--command "<SQL>"` 直接執行；各 migration 檔開頭有單行版本或內容很短可直接貼上。
 
