@@ -1119,11 +1119,31 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch((error) => console.error('Service worker registration failed', error));
 }
 
+// An invite link (/?join=CODE) adds this person to the group. The code is in the query rather than the
+// #hash because the hash is more likely to be dropped along the sign-in redirects.
+async function acceptInvite() {
+  const code = new URLSearchParams(location.search).get('join');
+  if (!code) return null;
+  history.replaceState(null, '', `${location.pathname}${location.hash}`);
+  try {
+    return await api('POST', { code }, '', '/api/join');
+  } catch (error) {
+    alert(error.message);
+    return null;
+  }
+}
+
 prefillFromShare();
 watchMyPosition();
 showView();
-loadLists()
-  .then(() => loadPlaces({ markRead: true }))
+acceptInvite()
+  .then(async (joined) => {
+    await loadLists();
+    if (!joined) return loadPlaces({ markRead: true });
+    switchToList(joined.list_id);
+    location.hash = '#list';
+    alert(joined.already_member ? `你已經在「${joined.list_name}」裡了` : `已加入「${joined.list_name}」！`);
+  })
   .catch((error) => {
     listMessage.textContent = `載入清單失敗：${error.message}`;
   });

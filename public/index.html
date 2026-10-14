@@ -135,6 +135,19 @@
       </form>
       <p id="members-message" role="status">載入中…</p>
       <ul id="member-list" class="user-list"></ul>
+      <section id="invite-section" class="invite-section" hidden>
+        <h2 class="section-title">🔗 邀請連結</h2>
+        <p class="meta">把連結傳給要加入的人，對方點開、登入後就會自動加入這個群組。每條連結只能讓一個人加入，7 天內有效。</p>
+        <button id="make-invite" type="button" class="secondary">產生邀請連結</button>
+        <div id="new-invite" class="new-invite" hidden>
+          <input id="invite-url" readonly aria-label="邀請連結">
+          <div class="actions">
+            <button id="share-invite" type="button">分享</button>
+            <button id="copy-invite" type="button" class="secondary">複製</button>
+          </div>
+        </div>
+        <ul id="invite-list" class="user-list"></ul>
+      </section>
       <section id="line-bind" class="line-bind" hidden>
         <h2 class="section-title">💬 LINE 群組</h2>
         <p class="meta">連結後，LINE 群組裡貼的 IG／FB／Threads／YouTube 連結會自動收進這個群組清單。</p>

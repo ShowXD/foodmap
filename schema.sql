@@ -109,6 +109,16 @@ CREATE TABLE IF NOT EXISTS place_thumbnails (
   fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Group invite links (/?join=CODE): one person each, valid 7 days, revocable; only the code's SHA-256 is stored.
+CREATE TABLE IF NOT EXISTS group_invites (
+  id INTEGER PRIMARY KEY,
+  code_hash TEXT NOT NULL UNIQUE,
+  list_id INTEGER NOT NULL REFERENCES lists (id) ON DELETE CASCADE,
+  created_by INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT NOT NULL
+);
+
 -- Extra sign-in emails linked to an account (e.g. a Google login with a different address); users.email is the main one.
 CREATE TABLE IF NOT EXISTS user_identities (
   email TEXT PRIMARY KEY,

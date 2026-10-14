@@ -62,9 +62,80 @@ async function load() {
   const mine = members.find((member) => member.user_id === me.id);
   leaveButton.hidden = !mine || Boolean(mine.is_owner);
   lineSection.hidden = !canManage;
+  inviteSection.hidden = !canManage;
   bindInstructions.hidden = true;
-  if (canManage) await loadLineGroups();
+  newInvite.hidden = true;
+  groupName = list.name;
+  if (canManage) await Promise.all([loadLineGroups(), loadInvites()]);
 }
+
+// ---- Invite links (one person each, 7 days; see functions/api/invites.js) ----
+const inviteSection = document.getElementById('invite-section');
+const inviteList = document.getElementById('invite-list');
+const newInvite = document.getElementById('new-invite');
+const inviteUrl = document.getElementById('invite-url');
+let groupName = '';
+
+async function loadInvites() {
+  const active = await api('GET', null, `?list=${listId}`, '/api/invites');
+  inviteList.replaceChildren(...active.map((invite) => {
+    const item = document.createElement('li');
+    item.className = 'place';
+    const meta = document.createElement('p');
+    meta.className = 'meta';
+    meta.textContent = `還沒用的邀請連結 · 產生於 ${invite.created_at}，到期 ${invite.expires_at} (UTC)`;
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    const revoke = document.createElement('button');
+    revoke.type = 'button';
+    revoke.className = 'secondary';
+    revoke.textContent = '作廢';
+    revoke.addEventListener('click', async () => {
+      try {
+        await api('DELETE', { id: invite.id }, '', '/api/invites');
+        await loadInvites();
+      } catch (error) {
+        message.textContent = `作廢失敗：${error.message}`;
+      }
+    });
+    actions.append(revoke);
+    item.append(meta, actions);
+    return item;
+  }));
+}
+
+document.getElementById('make-invite').addEventListener('click', async () => {
+  try {
+    const { code } = await api('POST', { list_id: listId }, '', '/api/invites');
+    inviteUrl.value = `${location.origin}/?join=${code}`;
+    newInvite.hidden = false;
+    await loadInvites();
+  } catch (error) {
+    message.textContent = `產生邀請連結失敗：${error.message}`;
+  }
+});
+
+document.getElementById('share-invite').addEventListener('click', async () => {
+  const text = `邀請你加入美食地圖的「${groupName}」，點開連結登入就會自動加入（7 天內有效）：`;
+  try {
+    if (navigator.share) await navigator.share({ title: '美食地圖邀請', text, url: inviteUrl.value });
+    else await copyInvite(`${text}\n${inviteUrl.value}`);
+  } catch (error) {
+    if (error.name !== 'AbortError') message.textContent = `分享失敗：${error.message}`;
+  }
+});
+
+async function copyInvite(text = inviteUrl.value) {
+  await navigator.clipboard.writeText(text);
+  message.textContent = '已複製邀請連結，可以貼到 LINE 了';
+}
+
+document.getElementById('copy-invite').addEventListener('click', () => {
+  copyInvite().catch(() => {
+    inviteUrl.select();
+    message.textContent = '請長按連結手動複製';
+  });
+});
 
 // ---- LINE groups feeding this list (owners bind them with a one-time code) ----
 const lineSection = document.getElementById('line-bind');
