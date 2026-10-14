@@ -203,7 +203,32 @@ function renderPlace(place) {
   locate.addEventListener('click', () => openLocateDialog(place));
   card.querySelector('.share').addEventListener('click', () => sharePlace(place));
   card.querySelector('.edit').addEventListener('click', () => startEdit(place));
+  const reanalyze = card.querySelector('.reanalyze');
+  // LINE links saved after the day's AI limit keep their post text but no shop details.
+  reanalyze.hidden = Boolean(place.name) || !place.caption;
+  reanalyze.addEventListener('click', () => reanalyzePlace(place, reanalyze));
   return card;
+}
+
+// Fills this place from its saved post text; extra shops in the same post become their own places.
+async function reanalyzePlace(place, button) {
+  button.disabled = true;
+  button.textContent = 'AI 分析中…';
+  try {
+    const [first, ...others] = (await api('POST', { url: place.url, caption: place.caption }, '', '/api/extract')).places;
+    const blanks = Object.fromEntries(['name', 'dishes', 'area', 'address', 'tags']
+      .filter((key) => !place[key] && first[key]).map((key) => [key, first[key]]));
+    await api('PATCH', { ...blanks, id: place.id });
+    for (const other of others) {
+      await api('POST', { ...other, list_id: place.list_id ?? currentListId, url: place.url, caption: place.caption, source: place.source })
+        .catch((error) => { if (error.status !== 409) throw error; });
+    }
+    await loadPlaces();
+  } catch (error) {
+    alert(error.message);
+    button.disabled = false;
+    button.textContent = '✨ AI 重新分析';
+  }
 }
 
 async function toggleStar(place, button) {
