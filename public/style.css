@@ -345,11 +345,6 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 .bind-instructions strong { color: var(--accent); font-size: 1.15rem; user-select: all; }
 .bind-instructions a { color: var(--accent); }
 
-/* ---- 使用條款與隱私權 (standalone page) ---- */
-.legal { padding-top: calc(env(safe-area-inset-top) + 16px); line-height: 1.6; }
-.legal h2 { font-size: 1.05rem; margin: 20px 0 6px; }
-.legal ul { padding-left: 20px; margin: 0; }
-.legal a:not(.back-link) { color: var(--accent); }
 .icon-button {
   display: grid;
   place-items: center;

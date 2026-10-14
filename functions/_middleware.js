@@ -3,7 +3,9 @@ import { ensureUser } from '../lib/users.js';
 import { LINK_COOKIE, clearLinkCookie, completeLink, linkResultCookie, readCookie } from '../lib/links.js';
 
 // The LINE webhook can't log in; it authenticates with the x-line-signature header instead.
-const PUBLIC_PATHS = new Set(['/api/line/webhook']);
+// The privacy page is static text that must be readable before sign-in (it is linked from Google's
+// consent screen); it has its own Access bypass and inlines its styles so nothing else needs one.
+const PUBLIC_PATHS = new Set(['/api/line/webhook', '/privacy', '/privacy.html']);
 // Disabled users can only see the notice page and their own status.
 const WAITING_PATHS = new Set(['/pending', '/pending.html', '/pending.js', '/api/me', '/icon.svg']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);

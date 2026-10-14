@@ -7,11 +7,24 @@
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
   <meta name="robots" content="noindex">
   <title>美食地圖・使用條款與隱私權</title>
-  <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
+  <!-- Public page (readable before sign-in): styles are inline so no other file needs to be public. -->
+  <style>
+    :root { color-scheme: light dark; --bg: #fffaf5; --text: #212529; --muted: #6c757d; --accent: #d9480f; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1a1a1a; --text: #f1f3f5; --muted: #adb5bd; --accent: #ff8a50; }
+    }
+    body { margin: 0; font-family: system-ui, "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 640px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 16px) 16px 32px; line-height: 1.6; }
+    h1 { font-size: 1.25rem; color: var(--accent); margin: 8px 0; }
+    h2 { font-size: 1.05rem; margin: 20px 0 6px; }
+    ul { padding-left: 20px; margin: 0; }
+    a { color: var(--accent); }
+    .back-link { text-decoration: none; }
+    .meta { color: var(--muted); font-size: 0.9rem; }
+  </style>
 </head>
 <body>
-  <main class="legal">
+  <main>
     <a class="back-link" href="/#me">← 回美食地圖</a>
     <h1>使用條款與隱私權</h1>
     <p class="meta">最後更新：2026-10-13</p>

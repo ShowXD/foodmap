@@ -115,6 +115,10 @@ async function runMiddleware(url, env, headers = {}, method = 'GET') {
 test('middleware fails closed and never trusts DEV_USER_EMAIL outside localhost', async () => {
   const db = dbWithUsers([{ email: 'me@example.com', status: 'approved', is_admin: 1 }]);
   assert.ok((await runMiddleware('https://foodmap.pages.dev/api/line/webhook', {})).passed);
+  // The privacy page is public (linked from Google's consent screen); nothing else becomes public with it.
+  assert.ok((await runMiddleware('https://foodmap.pages.dev/privacy', {})).passed);
+  assert.equal((await runMiddleware('https://foodmap.pages.dev/privacy-and-more', { DB: db })).response.status, 503);
+  assert.equal((await runMiddleware('https://foodmap.pages.dev/style.css', { DB: db })).response.status, 503);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', { DB: db })).response.status, 503);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', { DB: db, DEV_USER_EMAIL: 'me@example.com' })).response.status, 503);
 
