@@ -6,7 +6,11 @@ import { createTestDb } from './d1.mjs';
 
 const post = (body) => new Request('http://localhost/api/extract', { method: 'POST', body: JSON.stringify(body) });
 
-test('isSocialUrl only allows IG/FB/Threads hosts', () => {
+test('isSocialUrl only allows IG/FB/Threads/YouTube hosts', () => {
+  assert.ok(isSocialUrl('https://youtube.com/shorts/AbCdEfGhIjk'));
+  assert.ok(isSocialUrl('https://m.youtube.com/shorts/AbCdEfGhIjk?feature=share'));
+  assert.ok(isSocialUrl('https://youtu.be/AbCdEfGhIjk'));
+  assert.ok(!isSocialUrl('https://notyoutube.com/shorts/x'));
   assert.ok(isSocialUrl('https://www.instagram.com/reel/abc/'));
   assert.ok(isSocialUrl('https://m.facebook.com/watch?v=1'));
   assert.ok(isSocialUrl('https://fb.watch/xyz'));

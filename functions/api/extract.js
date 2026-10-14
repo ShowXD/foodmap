@@ -4,7 +4,7 @@ import { APIS, recordUsage, takeUserQuota } from '../../lib/usage.js';
 // Free tier: 10,000 neurons/day; one extraction is roughly 70 neurons.
 const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const MAX_CAPTION_LENGTH = 5000;
-const SOCIAL_HOSTS = ['instagram.com', 'facebook.com', 'fb.watch', 'fb.com', 'threads.net', 'threads.com'];
+const SOCIAL_HOSTS = ['instagram.com', 'facebook.com', 'fb.watch', 'fb.com', 'threads.net', 'threads.com', 'youtube.com', 'youtu.be'];
 const FIELD_NAMES = ['name', 'dishes', 'area', 'address', 'tags'];
 const MAX_PLACES = 10;
 // og tags sit in <head>, so the first 512 KB is plenty and caps memory per request.
@@ -69,7 +69,7 @@ export function parseOgText(html) {
   return [...new Set([readOgMeta(html, 'og:title'), readOgMeta(html, 'og:description')].filter(Boolean))].join('\n');
 }
 
-/** The start of an IG/FB/Threads page (where the og tags are), or '' when it can't be read. */
+/** The start of an IG/FB/Threads/YouTube page (where the og tags are), or '' when it can't be read. */
 export async function fetchSocialPage(url) {
   try {
     const response = await fetch(url, {
