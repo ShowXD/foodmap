@@ -23,7 +23,8 @@ const TAIWAN = { lat: 23.7, lng: 120.96 };
 let lists = [];
 let currentListId = null;
 let places = [];
-let filter = { mode: 'all', tag: null };
+let filter = { mode: 'all', tag: null, radius: undefined };
+const NEAR_RADII_KM = [1, 3, 5];
 let layout = readSetting(LAYOUT_STORAGE_KEY) === 'grid' ? 'grid' : 'rows';
 let myPosition = null;
 let locationError = null;
@@ -290,7 +291,7 @@ function matchesFilter(place) {
   if (filter.mode === 'visited' && !place.my_visited_at) return false;
   if (filter.mode === 'starred' && !place.starred) return false;
   if (filter.mode === 'untidy' && !needsTidying(place)) return false;
-  if (filter.mode === 'near' && distanceTo(place) == null) return false;
+  if (filter.mode === 'near' && !(distanceTo(place) != null && distanceTo(place) <= filter.radius)) return false;
   if (filter.tag && !tagsOf(place).includes(filter.tag)) return false;
   return true;
 }
@@ -298,13 +299,18 @@ function matchesFilter(place) {
 function renderChips() {
   const untidy = places.filter(needsTidying).length;
   const modes = [['all', '全部'], ['todo', '未吃'], ['visited', '吃過'], ['starred', '★ 想吃']];
-  if (myPosition) modes.splice(1, 0, ['near', '📍 附近']);
+  if (myPosition) modes.splice(1, 0, ...NEAR_RADII_KM.map((km) => ['near', `📍 ${km} 公里`, km]));
   if (untidy) modes.push(['untidy', `待整理 ${untidy}`]);
   const tags = [...new Set(places.flatMap(tagsOf))].sort();
   // The list and the map share one filter, so both rows show the same chips.
   for (const container of [filterChips, $('map-chips')]) {
     container.replaceChildren(
-      ...modes.map(([mode, label]) => chip(label, filter.mode === mode, () => { filter.mode = mode; renderPlaces(); })),
+      ...modes.map(([mode, label, radius]) => chip(label, filter.mode === mode && filter.radius === radius, () => {
+        filter.mode = mode;
+        filter.radius = radius;
+        renderPlaces();
+        if (radiusCircle?.getMap()) map.fitBounds(radiusCircle.getBounds(), 24);
+      })),
       ...tags.map((tag) => chip(`#${tag}`, filter.tag === tag, () => { filter.tag = filter.tag === tag ? null : tag; renderPlaces(); })),
     );
   }
@@ -462,11 +468,25 @@ function renderMarkers() {
     hasFittedMap = true;
     fitToPlaces(shown);
   }
+  renderRadius();
   markers = shown.map((place) => {
     const marker = new markerLibrary.AdvancedMarkerElement({ map, position: latLngOf(place), title: place.name || '', content: pinFor(place), gmpClickable: true });
     marker.addEventListener('gmp-click', () => showMapCard(place));
     return marker;
   });
+}
+
+// The 幾公里內 filter draws its range around the person's position.
+let radiusCircle = null;
+function renderRadius() {
+  if (!map || !myPosition || filter.mode !== 'near') {
+    radiusCircle?.setMap(null);
+    return;
+  }
+  radiusCircle ??= new google.maps.Circle({
+    clickable: false, strokeColor: '#d9480f', strokeOpacity: 0.7, strokeWeight: 2, fillColor: '#d9480f', fillOpacity: 0.08,
+  });
+  radiusCircle.setOptions({ map, center: myPosition, radius: filter.radius * 1000 });
 }
 
 function fitToPlaces(shown) {
@@ -508,6 +528,7 @@ function showMyPosition(shouldCenter) {
   if (!map || !myPosition) return;
   if (myMarker) {
     myMarker.position = myPosition;
+    renderRadius();
     return;
   }
   const dot = document.createElement('div');
