@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
-import { isSameShop, refreshStaleLocations, searchPlaces } from '../lib/google.js';
+import { isSameAddress, isSameShop, refreshStaleLocations, searchPlaces } from '../lib/google.js';
+import * as reanalyze from '../functions/api/reanalyze.js';
 import * as places from '../functions/api/places.js';
 import * as placeSearch from '../functions/api/place-search.js';
 import * as placeLocation from '../functions/api/place-location.js';
@@ -107,6 +108,37 @@ test('stale Google coordinates are refreshed by place ID; places Google dropped 
   sent.length = 0;
   await refreshStaleLocations(DB, KEY, 1);
   assert.equal(sent.length, 0, 'fresh coordinates are not fetched again');
+  googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
+});
+
+test('isSameAddress compares street and door number, ignoring 臺/台, spaces, full-width digits and the postcode', () => {
+  assert.equal(isSameAddress('臺中市西區華美街204號', '403台灣台中市西區華美街204號'), true);
+  assert.equal(isSameAddress('華美街２０４號', '403台灣臺中市西區華美街 204 號'), true);
+  assert.equal(isSameAddress('台北市大安區忠孝東路四段216巷27弄16號', '106台灣台北市大安區忠孝東路四段216巷27弄16號'), true);
+  assert.equal(isSameAddress('臺中市西區華美街204號', '403台灣臺中市西區華美街206號'), false);
+  assert.equal(isSameAddress('臺中市西區', '403台灣臺中市西區華美街204號'), false, 'no street number: not enough to trust');
+  assert.equal(isSameAddress('', '403台灣臺中市西區華美街204號'), false);
+});
+
+test('AI 重新分析: fills a nameless place, locates it by address when names differ, and counts the person\'s AI quota', async () => {
+  const { DB, env, mom, stranger, call, row } = await setup();
+  DB.sqlite.exec(`INSERT INTO places (id, list_id, url, caption, source, ai_pending) VALUES
+    (20, 1, 'https://fb.watch/b', '#江家餛飩 📍臺中市西區華美街204號 還有阿宗麵線', 'line', 1),
+    (21, 1, 'https://fb.watch/c', NULL, 'line', 0)`);
+  env.AI = { run: async () => ({ response: { places: [{ name: '江家餛飩', address: '臺中市西區華美街204號' }, { name: '阿宗麵線' }] } }) };
+  googleReply = () => Response.json({ places: [{ ...googleHit('江家餛飩麵（華美街）'), formattedAddress: '403台灣台中市西區華美街204號' }] });
+
+  assert.equal((await call(reanalyze.onRequestPost, stranger, { body: { place_id: 20 } })).status, 404);
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 21 } })).status, 422, 'no post text saved');
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } })).status, 200);
+  assert.deepEqual([row(20).name, row(20).google_place_id, row(20).ai_pending], ['江家餛飩', GOOGLE_ID, 0]);
+  const second = DB.sqlite.prepare("SELECT name, source, created_by FROM places WHERE url = 'https://fb.watch/b' AND id <> 20").get();
+  assert.deepEqual({ ...second }, { name: '阿宗麵線', source: 'line', created_by: null });
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } })).status, 409, 'already named');
+
+  DB.sqlite.prepare("UPDATE user_daily_usage SET count = 30 WHERE user_id = ? AND api = 'workers_ai'").run(mom.id);
+  DB.sqlite.exec("UPDATE places SET name = '' WHERE id = 20");
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } })).status, 429);
   googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
 });
 

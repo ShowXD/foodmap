@@ -1,5 +1,5 @@
 import { isSocialUrl, fetchCaption, extractPlaces } from '../extract.js';
-import { isSameShop, placeQuery, saveLocation, searchPlaces } from '../../../lib/google.js';
+import { isSameAddress, isSameShop, placeQuery, saveLocation, searchPlaces } from '../../../lib/google.js';
 import { APIS, dayIn, recordUsage } from '../../../lib/usage.js';
 
 const MAX_LINKS_PER_MESSAGE = 3;
@@ -58,18 +58,42 @@ async function canUseLineAi(db, listId) {
   return row.total < LINE_DAILY_AI_LIMIT && row.this_list < LINE_LIST_DAILY_AI_LIMIT;
 }
 
-async function savePlace(db, listId, messageId, url, caption, place = {}, isAiPending = false) {
+/** `post` is where the shop came from: { list_id, url, caption, source, line_message_id, created_by }. */
+async function savePlace(db, post, place = {}, isAiPending = false) {
   const fields = { name: place.name ?? '', dishes: place.dishes ?? '', area: place.area ?? '', address: place.address ?? '', tags: place.tags ?? '' };
   const saved = await db
     .prepare(
-      `INSERT INTO places (list_id, url, caption, name, dishes, area, address, tags, source, line_message_id, ai_pending)
-       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'line', ?9, ?10
+      `INSERT INTO places (list_id, url, caption, name, dishes, area, address, tags, source, line_message_id, ai_pending, created_by)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
        WHERE NOT EXISTS (SELECT 1 FROM places WHERE list_id = ?1 AND url = ?2 AND COALESCE(name, '') = ?4)
        RETURNING id`,
     )
-    .bind(listId, url, caption.slice(0, MAX_CAPTION_LENGTH), fields.name, fields.dishes, fields.area, fields.address, fields.tags, messageId, isAiPending ? 1 : 0)
+    .bind(post.list_id, post.url, (post.caption ?? '').slice(0, MAX_CAPTION_LENGTH), fields.name, fields.dishes, fields.area, fields.address, fields.tags,
+      post.source ?? 'line', post.line_message_id ?? null, isAiPending ? 1 : 0, post.created_by ?? null)
     .first();
   return saved?.id ?? null;
+}
+
+/**
+ * Fills a saved place that has no shop name yet from the AI's shops (keeping anything already typed in),
+ * saves the post's other shops next to it, and locates them. False when someone named it meanwhile.
+ * Shared by the background retry and the in-app 「AI 重新分析」 (reanalyze.js).
+ */
+export async function fillFromAi(env, row, places) {
+  const [first, ...others] = places;
+  if (!first) return false;
+  const filled = await env.DB
+    .prepare(
+      `UPDATE places SET name = ?, dishes = COALESCE(NULLIF(dishes, ''), ?), area = COALESCE(NULLIF(area, ''), ?),
+              address = COALESCE(NULLIF(address, ''), ?), tags = COALESCE(NULLIF(tags, ''), ?), ai_pending = 0
+       WHERE id = ? AND COALESCE(name, '') = '' RETURNING *`,
+    )
+    .bind(first.name, first.dishes, first.area, first.address, first.tags, row.id)
+    .first();
+  if (!filled) return false;
+  await locateAutomatically(env, filled.id, filled);
+  for (const place of others) await locateAutomatically(env, await savePlace(env.DB, filled, place), place);
+  return true;
 }
 
 // Below this many AI calls today (UTC, all uses together), links skipped earlier are analysed in the
@@ -88,7 +112,7 @@ export async function retryPendingAi(env, listId, now = new Date()) {
     .prepare(
       `UPDATE places SET ai_pending = 0
        WHERE id IN (SELECT id FROM places WHERE list_id = ? AND ai_pending = 1 ORDER BY id LIMIT ?)
-       RETURNING id, list_id, url, caption, line_message_id`,
+       RETURNING id, caption`,
     )
     .bind(listId, room)
     .all();
@@ -100,28 +124,18 @@ export async function retryPendingAi(env, listId, now = new Date()) {
       await env.DB.prepare('UPDATE places SET ai_pending = 1 WHERE id = ?').bind(row.id).run();
       return;
     }
-    const [first, ...others] = places;
-    if (!first) continue;
-    // Someone may have filled it in by hand meanwhile; never overwrite that.
-    const filled = await env.DB
-      .prepare("UPDATE places SET name = ?, dishes = ?, area = ?, address = ?, tags = ? WHERE id = ? AND COALESCE(name, '') = ''")
-      .bind(first.name, first.dishes, first.area, first.address, first.tags, row.id)
-      .run();
-    if (!filled.meta.changes) continue;
-    await locateAutomatically(env, row.id, first);
-    for (const place of others) {
-      await locateAutomatically(env, await savePlace(env.DB, row.list_id, row.line_message_id, row.url, row.caption, place), place);
-    }
+    await fillFromAi(env, row, places);
   }
 }
 
-// Only Google's top hit, and only when its name matches; anything doubtful stays in 待整理 for a person to pick.
+// Only Google's top hit, and only when its name or street address matches the post's; anything doubtful
+// stays in 待整理 for a person to pick.
 async function locateAutomatically(env, placeId, place) {
-  if (!env.GOOGLE_PLACES_KEY || !placeId || !place.name) return;
+  if (!env.GOOGLE_PLACES_KEY || !placeId || !(place.name || place.address)) return;
   try {
     await recordUsage(env.DB, 'places_search');
     const [best] = await searchPlaces(env.GOOGLE_PLACES_KEY, placeQuery(place));
-    if (best && isSameShop(place.name, best.name)) await saveLocation(env.DB, placeId, best);
+    if (best && (isSameShop(place.name, best.name) || isSameAddress(place.address, best.address))) await saveLocation(env.DB, placeId, best);
   } catch (error) {
     console.error('Auto-locate failed', error.message);
   }
@@ -179,9 +193,10 @@ async function collectLinks(env, event) {
       }
     }
     // Never lose a link: if AI found nothing, save the bare link for manual editing (or a later retry).
-    if (places.length === 0) await savePlace(env.DB, listId, event.message.id, url, caption, {}, isAiPending);
+    const post = { list_id: listId, url, caption, source: 'line', line_message_id: event.message.id };
+    if (places.length === 0) await savePlace(env.DB, post, {}, isAiPending);
     for (const place of places) {
-      await locateAutomatically(env, await savePlace(env.DB, listId, event.message.id, url, caption, place), place);
+      await locateAutomatically(env, await savePlace(env.DB, post, place), place);
     }
   }
 }

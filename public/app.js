@@ -205,24 +205,17 @@ function renderPlace(place) {
   card.querySelector('.edit').addEventListener('click', () => startEdit(place));
   const reanalyze = card.querySelector('.reanalyze');
   // LINE links saved after the day's AI limit keep their post text but no shop details.
-  reanalyze.hidden = Boolean(place.name) || !place.caption;
+  reanalyze.hidden = !canReanalyze(place);
   reanalyze.addEventListener('click', () => reanalyzePlace(place, reanalyze));
   return card;
 }
 
-// Fills this place from its saved post text; extra shops in the same post become their own places.
+// The server fills it from its saved post text, adds the post's other shops, and locates them.
 async function reanalyzePlace(place, button) {
   button.disabled = true;
   button.textContent = 'AI 分析中…';
   try {
-    const [first, ...others] = (await api('POST', { url: place.url, caption: place.caption }, '', '/api/extract')).places;
-    const blanks = Object.fromEntries(['name', 'dishes', 'area', 'address', 'tags']
-      .filter((key) => !place[key] && first[key]).map((key) => [key, first[key]]));
-    if (Object.keys(blanks).length) await api('PATCH', { ...blanks, id: place.id });
-    for (const other of others) {
-      await api('POST', { ...other, list_id: place.list_id ?? currentListId, url: place.url, caption: place.caption, source: place.source })
-        .catch((error) => { if (error.status !== 409) throw error; });
-    }
+    await api('POST', { place_id: place.id }, '', '/api/reanalyze');
     await loadPlaces();
   } catch (error) {
     alert(error.message);
@@ -230,6 +223,29 @@ async function reanalyzePlace(place, button) {
     button.textContent = '✨ AI 重新分析';
   }
 }
+
+const canReanalyze = (place) => !place.name && Boolean(place.caption);
+const reanalyzeAllButton = $('reanalyze-all');
+reanalyzeAllButton.addEventListener('click', async () => {
+  const waiting = places.filter(canReanalyze);
+  reanalyzeAllButton.disabled = true;
+  let done = 0;
+  try {
+    // One at a time: each is a few seconds of AI, and a quota error should stop the rest.
+    for (const place of waiting) {
+      reanalyzeAllButton.textContent = `AI 分析中 ${done + 1}/${waiting.length}…`;
+      await api('POST', { place_id: place.id }, '', '/api/reanalyze').catch((error) => {
+        if (error.status !== 422 && error.status !== 409) throw error; // nothing found / named meanwhile: skip it
+      });
+      done++;
+    }
+  } catch (error) {
+    alert(`分析了 ${done} 家後停止：${error.message}`);
+  } finally {
+    reanalyzeAllButton.disabled = false;
+    await loadPlaces();
+  }
+});
 
 async function toggleStar(place, button) {
   button.disabled = true;
@@ -353,6 +369,9 @@ function renderPlaces() {
     button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
   }
   placeList.replaceChildren(...shown.map((place) => renderListItem(place, layout)));
+  const waitingForAi = places.filter(canReanalyze).length;
+  reanalyzeAllButton.hidden = !waitingForAi;
+  if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 待整理的 ${waitingForAi} 家全部 AI 重新分析`;
   const query = searchInput.value.trim();
   if (shown.length) listMessage.textContent = '';
   else if (places.length) listMessage.textContent = '沒有符合篩選的店';
