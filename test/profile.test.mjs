@@ -55,6 +55,19 @@ test('photo upload: only real JPEG/PNG/WebP under the size limit; served back an
   assert.equal((await call(getAvatar, { params: { id: String(mom.id) } })).status, 404);
 });
 
+test('a photo is visible to its owner, people in a shared group and site admins only', async () => {
+  const { DB, mom, call } = await setup();
+  const kid = await ensureUser(DB, 'kid@example.test', {});
+  const stranger = await ensureUser(DB, 'stranger@example.test', {});
+  const admin = await ensureUser(DB, 'admin@example.test', { ADMIN_EMAILS: 'admin@example.test' });
+  DB.sqlite.exec(`INSERT INTO lists (id, name, is_personal) VALUES (1, '家人', 0);
+    INSERT INTO list_members (list_id, user_id) VALUES (1, ${mom.id}), (1, ${kid.id})`);
+  await call(avatar.onRequestPut, { method: 'PUT', body: JPEG, headers: { 'Content-Type': 'image/jpeg' } });
+
+  const look = async (viewer) => (await call(getAvatar, { user: viewer, params: { id: String(mom.id) } })).status;
+  assert.deepEqual([await look(mom), await look(kid), await look(admin), await look(stranger)], [200, 200, 200, 404]);
+});
+
 test('family ratings carry each person\'s display name', async () => {
   const { DB, mom } = await setup();
   DB.sqlite.exec(`INSERT INTO lists (id, name, is_personal) VALUES (1, '家人', 0);
