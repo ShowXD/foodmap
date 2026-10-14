@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
-import { onRequestPost, parseLinks, isValidLineSignature } from '../functions/api/line/webhook.js';
+import { onRequestPost, parseLinks, isValidLineSignature, retryPendingAi, RETRY_AI_BELOW } from '../functions/api/line/webhook.js';
 import * as lineGroups from '../functions/api/line-groups.js';
 
 const SECRET = 'test-channel-secret';
@@ -67,7 +67,7 @@ test('unbound groups are recorded but nothing is saved', async () => {
 test('bound group: each shop the AI finds is saved once, even if LINE redelivers', async () => {
   const { DB, send, places } = setup(twoShopsAI);
   DB.sqlite.exec(`INSERT INTO line_groups (group_id, list_id) VALUES ('${GROUP}', 1)`);
-  const event = textEvent('m2', '台北兩家 https://www.instagram.com/reel/a/');
+  const event = textEvent('m2', '台北兩家：阿宗麵線的大腸麵線、林東芳牛肉麵 https://www.instagram.com/reel/a/');
   await send([event]);
   await send([event]);
   assert.deepEqual(places(), [
@@ -87,6 +87,40 @@ test('one list can use at most 20 AI extractions a day; after that links are sav
   await send([textEvent('m9', '好吃 https://www.instagram.com/reel/new/')]);
   assert.equal(aiCalls, 0);
   assert.deepEqual(places().filter((place) => place.line_message_id === 'm9').map((place) => place.name), ['']);
+});
+
+test('links skipped over the limit are analysed later, while today\'s AI count has room', async () => {
+  let aiCalls = 0;
+  const postAI = { run: async () => { aiCalls++; return { response: { places: [{ name: '江家餛飩', dishes: '炒手麵', address: '華美街204號' }, { name: '阿宗麵線' }] } }; } };
+  const { DB, env, send, places } = setup(postAI);
+  DB.sqlite.exec(`INSERT INTO line_groups (group_id, list_id) VALUES ('${GROUP}', 1)`);
+  const earlier = Array.from({ length: 20 }, (_, index) => `(1, 'https://fb.watch/old${index}', '舊店', 'line', 'old${index}')`).join(', ');
+  DB.sqlite.exec(`INSERT INTO places (list_id, url, name, source, line_message_id) VALUES ${earlier}`);
+  await send([
+    textEvent('p1', '#江家餛飩 炒手麵 華美街204號 還有阿宗麵線 https://www.instagram.com/reel/p1/'),
+    textEvent('p2', '江家餛飩 https://www.instagram.com/reel/p2/'),
+  ]);
+  assert.equal(aiCalls, 0);
+  const pending = () => DB.sqlite.prepare('SELECT url FROM places WHERE ai_pending = 1 ORDER BY id').all().map((row) => row.url);
+  assert.deepEqual(pending(), ['https://www.instagram.com/reel/p1/', 'https://www.instagram.com/reel/p2/']);
+
+  // No room today: nothing is touched.
+  const today = new Date().toISOString().slice(0, 10);
+  DB.sqlite.prepare("INSERT INTO api_usage (api, day, count) VALUES ('workers_ai', ?, ?)").run(today, RETRY_AI_BELOW);
+  await retryPendingAi(env, 1);
+  assert.equal(aiCalls, 0);
+
+  // Room again (a new day): p1 is filled in place plus its second shop; p2 was edited by hand meanwhile and stays as is.
+  DB.sqlite.exec("UPDATE api_usage SET count = 0");
+  DB.sqlite.exec("UPDATE places SET name = '手動填的' WHERE url = 'https://www.instagram.com/reel/p2/'");
+  await retryPendingAi(env, 1);
+  assert.equal(aiCalls, 2);
+  assert.deepEqual(pending(), []);
+  assert.deepEqual(places().filter((p) => p.line_message_id.startsWith('p')).map((p) => [p.line_message_id, p.name, p.dishes]), [
+    ['p1', '江家餛飩', '炒手麵'],
+    ['p2', '手動填的', ''],
+    ['p1', '阿宗麵線', ''],
+  ]);
 });
 
 test('links are never lost: AI failure or no caption saves the bare link', async () => {

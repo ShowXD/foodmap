@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS places (
   lat REAL,
   lng REAL,
   location_source TEXT CHECK (location_source IN ('google', 'manual')),
-  location_fetched_at TEXT
+  location_fetched_at TEXT,
+  -- 1 = a LINE link saved while the day's AI limit was used up; analysed later (line/webhook.js retryPendingAi).
+  ai_pending INTEGER NOT NULL DEFAULT 0
 );
 
 -- LINE groups the bot has been added to. Links are only collected once a site admin

@@ -1,5 +1,6 @@
 import { findAccessibleList } from '../../lib/lists.js';
 import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
+import { retryPendingAi } from './line/webhook.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
 const SEARCH_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'note', 'caption'];
@@ -54,6 +55,7 @@ export async function onRequestGet({ request, env, data, waitUntil }) {
   if (!list) return listNotFound();
   await expireGoogleLocations(env.DB, list.id);
   if (env.GOOGLE_PLACES_KEY) waitUntil(refreshStaleLocations(env.DB, env.GOOGLE_PLACES_KEY, list.id));
+  if (env.AI) waitUntil(retryPendingAi(env, list.id).catch((error) => console.error('AI retry failed', error.message)));
 
   const query = params.get('q')?.trim().slice(0, MAX_QUERY_LENGTH);
   // ponytail: LIKE full scan per list, fine for hundreds of rows; switch to FTS5 if it gets slow
@@ -120,7 +122,8 @@ export async function onRequestPatch({ request, env, data }) {
   if (!current || !(await findAccessibleList(env.DB, data.user, current.list_id))) return json({ error: 'not found' }, 404);
 
   const place = await env.DB
-    .prepare(`UPDATE places SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE id = ? RETURNING *`)
+    // Once a person edits it, the background AI retry leaves it alone.
+    .prepare(`UPDATE places SET ${keys.map((k) => `${k} = ?`).join(', ')}, ai_pending = 0 WHERE id = ? RETURNING *`)
     .bind(...Object.values(fields), body.id)
     .first();
   return json(place);

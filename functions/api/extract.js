@@ -151,6 +151,7 @@ export async function extractPlaces(ai, caption) {
       ],
       response_format: { type: 'json_schema', json_schema: PLACES_SCHEMA },
       max_tokens: 1536,
+      temperature: 0,
     });
   } catch (error) {
     // Covers the daily free-neuron limit and "JSON Mode couldn't be met".
@@ -162,7 +163,31 @@ export async function extractPlaces(ai, caption) {
     console.error('Workers AI returned unusable output');
     return { error: 'unusable' };
   }
-  return { places };
+  return { places: groundPlaces(places, caption) };
+}
+
+// Words AI may add even when the post leaves them out (「台中」→「台中市」).
+const ADMIN_SUFFIXES = '市縣區鄉鎮';
+const unifyTai = (text) => text.replaceAll('臺', '台');
+
+// The model now and then garbles Chinese (「江家餛飩」→「江家予龍」, simplified characters), so a value
+// is kept only if every Chinese character in it also appears in the post. Invented tags go too.
+function isInPost(value, post) {
+  return [...unifyTai(value)].every((char) => !/\p{Script=Han}/u.test(char) || ADMIN_SUFFIXES.includes(char) || post.includes(char));
+}
+
+export function groundPlaces(places, caption) {
+  const post = unifyTai(caption);
+  const keepWords = (text, separator, joiner) => text.split(separator).map((word) => word.trim()).filter((word) => word && isInPost(word, post)).join(joiner);
+  return places
+    .map((place) => ({
+      name: isInPost(place.name, post) ? place.name : '',
+      dishes: keepWords(place.dishes, /[、,，]/, '、'),
+      area: isInPost(place.area, post) ? place.area : '',
+      address: isInPost(place.address, post) ? place.address : '',
+      tags: keepWords(place.tags, /[\s,，、#]+/, ' '),
+    }))
+    .filter((place) => place.name || place.dishes || place.address);
 }
 
 // JSON mode returns an object, but some models return the JSON as a string.

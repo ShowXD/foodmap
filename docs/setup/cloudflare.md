@@ -310,6 +310,7 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0012_friends.sql` | 每人每日用量上限、LINE 群組綁定碼 | 還沒有 `user_daily_usage` 表的資料庫 |
 | `0013_identities.sql` | 不同 email 的登入方式綁成同一個帳號 | 還沒有 `user_identities` 表的資料庫 |
 | `0014_invites.sql` | 群組邀請連結 | 還沒有 `group_invites` 表的資料庫 |
+| `0015_ai_pending.sql` | LINE 連結超過 AI 上限時，之後自動補分析 | `places` 還沒有 `ai_pending` 欄位的資料庫（只能跑一次，重跑會報欄位已存在） |
 
 > 若 `--file` 出現 `Authentication error [code: 10000]`（匯入 API 的權限問題），改用 `--command "<SQL>"` 直接執行；各 migration 檔開頭有單行版本或內容很短可直接貼上。
 

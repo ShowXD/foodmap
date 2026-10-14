@@ -218,7 +218,7 @@ async function reanalyzePlace(place, button) {
     const [first, ...others] = (await api('POST', { url: place.url, caption: place.caption }, '', '/api/extract')).places;
     const blanks = Object.fromEntries(['name', 'dishes', 'area', 'address', 'tags']
       .filter((key) => !place[key] && first[key]).map((key) => [key, first[key]]));
-    await api('PATCH', { ...blanks, id: place.id });
+    if (Object.keys(blanks).length) await api('PATCH', { ...blanks, id: place.id });
     for (const other of others) {
       await api('POST', { ...other, list_id: place.list_id ?? currentListId, url: place.url, caption: place.caption, source: place.source })
         .catch((error) => { if (error.status !== 409) throw error; });

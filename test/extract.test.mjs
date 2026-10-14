@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isSocialUrl, parseOgText, parsePlaces, onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
+import { isSocialUrl, parseOgText, parsePlaces, groundPlaces, onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
 import { ensureUser } from '../lib/users.js';
 import { createTestDb } from './d1.mjs';
 
@@ -41,6 +41,15 @@ test('parsePlaces handles several shops, JSON strings, and a bare single object'
   assert.equal(parsePlaces(undefined), null);
 });
 
+test('groundPlaces drops values the AI garbled or made up, keeping what the post says', () => {
+  const post = '#江家餛飩 📍臺中市西區華美街204號 📌紅油鮮蝦炒手麵 餛飩湯 #台中美食';
+  const garbled = { name: '江家予龍', dishes: '紅油蝦蘋十鸡龍', area: '號中市西園区', address: '號中市西園路區三萬號運204畫号', tags: '庫美美飯 #台中美食' };
+  const good = { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵, 餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食 平價' };
+  assert.deepEqual(groundPlaces([garbled, good], post), [
+    { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵、餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食' },
+  ]);
+});
+
 test('extract returns 503 when the AI binding is missing', async () => {
   const response = await onRequestPost({ request: post({ caption: 'x' }), env: {} });
   assert.equal(response.status, 503);
@@ -61,7 +70,7 @@ async function asUser(email) {
 test('extract returns every shop the AI found, 422 when none, and 502 when AI fails', async () => {
   const extract = await asUser('mom@example.test');
   const twoShops = { places: [{ name: '阿宗麵線', dishes: '麵線' }, { name: '林東芳牛肉麵', dishes: '牛肉麵' }] };
-  const ok = await extract({ caption: '一次吃兩家' }, { run: async () => ({ response: twoShops }) });
+  const ok = await extract({ caption: '一次吃兩家：阿宗麵線、林東芳牛肉麵' }, { run: async () => ({ response: twoShops }) });
   assert.equal(ok.status, 200);
   assert.deepEqual((await ok.json()).places.map((place) => place.name), ['阿宗麵線', '林東芳牛肉麵']);
 

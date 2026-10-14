@@ -1,6 +1,6 @@
 import { isSocialUrl, fetchCaption, extractPlaces } from '../extract.js';
 import { isSameShop, placeQuery, saveLocation, searchPlaces } from '../../../lib/google.js';
-import { recordUsage } from '../../../lib/usage.js';
+import { APIS, dayIn, recordUsage } from '../../../lib/usage.js';
 
 const MAX_LINKS_PER_MESSAGE = 3;
 // Shared with the in-app button's free Workers AI quota; past this, links are saved without AI.
@@ -58,18 +58,61 @@ async function canUseLineAi(db, listId) {
   return row.total < LINE_DAILY_AI_LIMIT && row.this_list < LINE_LIST_DAILY_AI_LIMIT;
 }
 
-async function savePlace(db, listId, messageId, url, caption, place = {}) {
+async function savePlace(db, listId, messageId, url, caption, place = {}, isAiPending = false) {
   const fields = { name: place.name ?? '', dishes: place.dishes ?? '', area: place.area ?? '', address: place.address ?? '', tags: place.tags ?? '' };
   const saved = await db
     .prepare(
-      `INSERT INTO places (list_id, url, caption, name, dishes, area, address, tags, source, line_message_id)
-       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'line', ?9
+      `INSERT INTO places (list_id, url, caption, name, dishes, area, address, tags, source, line_message_id, ai_pending)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'line', ?9, ?10
        WHERE NOT EXISTS (SELECT 1 FROM places WHERE list_id = ?1 AND url = ?2 AND COALESCE(name, '') = ?4)
        RETURNING id`,
     )
-    .bind(listId, url, caption.slice(0, MAX_CAPTION_LENGTH), fields.name, fields.dishes, fields.area, fields.address, fields.tags, messageId)
+    .bind(listId, url, caption.slice(0, MAX_CAPTION_LENGTH), fields.name, fields.dishes, fields.area, fields.address, fields.tags, messageId, isAiPending ? 1 : 0)
     .first();
   return saved?.id ?? null;
+}
+
+// Below this many AI calls today (UTC, all uses together), links skipped earlier are analysed in the
+// background; the rest of the free ~140 stays for people's own 「AI 自動填入」.
+export const RETRY_AI_BELOW = APIS.workers_ai.dailyLimit - 40;
+const RETRIES_PER_OPEN = 5;
+
+/** Analyses a few of this list's pending LINE links. Runs when someone opens the list (places.js GET). */
+export async function retryPendingAi(env, listId, now = new Date()) {
+  if (!env.AI) return;
+  const usage = await env.DB.prepare("SELECT count FROM api_usage WHERE api = 'workers_ai' AND day = ?").bind(dayIn('UTC', now)).first();
+  const room = Math.min(RETRIES_PER_OPEN, RETRY_AI_BELOW - (usage?.count ?? 0));
+  if (room <= 0) return;
+  // Claimed up front so two people opening the list at once don't analyse the same link twice.
+  const { results: claimed } = await env.DB
+    .prepare(
+      `UPDATE places SET ai_pending = 0
+       WHERE id IN (SELECT id FROM places WHERE list_id = ? AND ai_pending = 1 ORDER BY id LIMIT ?)
+       RETURNING id, list_id, url, caption, line_message_id`,
+    )
+    .bind(listId, room)
+    .all();
+  for (const row of claimed) {
+    await recordUsage(env.DB, 'workers_ai', now);
+    const { places = [], error } = await extractPlaces(env.AI, row.caption ?? '');
+    if (error === 'unavailable') {
+      // Cloudflare's own daily limit: put this one back and try again another time.
+      await env.DB.prepare('UPDATE places SET ai_pending = 1 WHERE id = ?').bind(row.id).run();
+      return;
+    }
+    const [first, ...others] = places;
+    if (!first) continue;
+    // Someone may have filled it in by hand meanwhile; never overwrite that.
+    const filled = await env.DB
+      .prepare("UPDATE places SET name = ?, dishes = ?, area = ?, address = ?, tags = ? WHERE id = ? AND COALESCE(name, '') = ''")
+      .bind(first.name, first.dishes, first.area, first.address, first.tags, row.id)
+      .run();
+    if (!filled.meta.changes) continue;
+    await locateAutomatically(env, row.id, first);
+    for (const place of others) {
+      await locateAutomatically(env, await savePlace(env.DB, row.list_id, row.line_message_id, row.url, row.caption, place), place);
+    }
+  }
 }
 
 // Only Google's top hit, and only when its name matches; anything doubtful stays in 待整理 for a person to pick.
@@ -124,12 +167,19 @@ async function collectLinks(env, event) {
 
     const caption = messageText || (await fetchCaption(url));
     let places = [];
-    if (caption && env.AI && (await canUseLineAi(env.DB, listId))) {
-      await recordUsage(env.DB, 'workers_ai');
-      ({ places = [] } = await extractPlaces(env.AI, caption));
+    let isAiPending = false;
+    if (caption && env.AI) {
+      if (await canUseLineAi(env.DB, listId)) {
+        await recordUsage(env.DB, 'workers_ai');
+        const extracted = await extractPlaces(env.AI, caption);
+        places = extracted.places ?? [];
+        isAiPending = extracted.error === 'unavailable';
+      } else {
+        isAiPending = true;
+      }
     }
-    // Never lose a link: if AI found nothing, save the bare link for manual editing.
-    if (places.length === 0) await savePlace(env.DB, listId, event.message.id, url, caption);
+    // Never lose a link: if AI found nothing, save the bare link for manual editing (or a later retry).
+    if (places.length === 0) await savePlace(env.DB, listId, event.message.id, url, caption, {}, isAiPending);
     for (const place of places) {
       await locateAutomatically(env, await savePlace(env.DB, listId, event.message.id, url, caption, place), place);
     }

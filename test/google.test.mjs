@@ -115,7 +115,7 @@ test('LINE: a shop is located automatically only when Google\'s top hit has the 
   DB.sqlite.exec("INSERT INTO line_groups (group_id, list_id) VALUES ('Cgroup', 1)");
   env.LINE_CHANNEL_SECRET = 'secret';
   env.AI = { run: async () => ({ response: { places: [{ name: '阿宗麵線', area: '台南' }, { name: '神秘小店' }] } }) };
-  const body = JSON.stringify({ events: [{ type: 'message', message: { id: 'm1', type: 'text', text: '好吃 https://www.instagram.com/reel/x/' }, source: { type: 'group', groupId: 'Cgroup' } }] });
+  const body = JSON.stringify({ events: [{ type: 'message', message: { id: 'm1', type: 'text', text: '台南阿宗麵線、神秘小店都好吃 https://www.instagram.com/reel/x/' }, source: { type: 'group', groupId: 'Cgroup' } }] });
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('secret'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signature = Buffer.from(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))).toString('base64');
   const pending = [];
