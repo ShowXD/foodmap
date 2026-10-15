@@ -202,6 +202,7 @@
   - 後端：`/api/places` POST 重複檢查改在同一句 INSERT（雙擊不會存兩筆；409 不再附 `place`）；PATCH 改用 `findAccessiblePlace`；`readCookie` 遇到格式錯誤的 cookie 回 null（原本整站 500）；`retryPendingAi` 出錯時把已認領的列標回 `ai_pending=1`；`schema.sql` 移除不再使用的 `extract_usage`（正式 DB 的表留著無害，未 DROP）；`cloudflare.md` 更正為 `user_daily_usage`
   - 刻意不做：16 個檔案各自的 `json()` 一行 helper 不合併；社群頁轉址改 `redirect: 'manual'`（目前抓完會再檢查網域，風險低）；`/api/places` 回傳完整 caption（清單破百筆再改成只回 has_caption）
   - 搜尋改在前端（使用者決定「今天吃什麼」永遠從整個清單抽，要縮小範圍用標籤）：`/api/places` 一律回傳整個清單（移除 `q` 參數與 LIKE 查詢）；`app.js` `matchesSearch` 比對店名、食物、地區、地址、標籤、備註、貼文文字，只影響清單與地圖；「今天吃什麼」與標籤選單用整個清單。打字不再發請求。本機驗證：搜尋「牛肉」清單剩 1 家、吃什麼仍從 6 家抽
+- **AI 標籤被濾光（2026-10-15 修正）**：亂碼過濾原本也要求標籤每個字出現在原文，但標籤多為 AI 自行歸納（「牛排」「平價」），正式資料中重新分析過的店（id 55、63、66、68）標籤全空。改為標籤不比對原文，只去掉 `#`、`|` 等符號並去重；店名／地址／地區／菜色仍比對。另外編輯頁「AI 自動填入」原本只補空白欄位，已填（含亂碼）的不會被修正 → 改為：空白直接填，與現有內容不同時 `confirm` 詢問是否取代。已存的空標籤店家：到編輯頁按「AI 自動填入」即可補上
 - **資安檢查（2026-10-15）**：整份程式唯讀審查，無嚴重／高風險。已確認沒問題：Access JWT 驗證（RS256、kid、iss/aud/exp/nbf）、`PUBLIC_PATHS` 精確比對、CSRF、每個 API 都經 `findAccessibleList`／`findAccessiblePlace`／`findManageableGroup`、SQL 全部參數化、CSV 公式注入、無 innerHTML、大頭貼權限與檔案檢查、webhook HMAC、邀請碼 256 位元雜湊單次、無外洩金鑰。已修：
   - 用 email 加群組成員只限網站管理員（使用者決定）：原本任何人可建群組→可把別人拉進群組、可探測 email 是否註冊、拉進後看得到對方大頭貼；群組擁有者改用邀請連結。非管理員在查 email 前就回 403
   - `/api/` 的跨站讀取也擋（原本只擋寫入；跨站 `<img src="/api/config">` 會扣使用者地圖額度）
