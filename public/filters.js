@@ -1,9 +1,12 @@
 // The 篩選與排序 sheet, and the row above the list and the map showing what is chosen (they share one filter).
 import { fitToRadius } from './map.js';
 import { $, openDialog } from './shared.js';
-import { byChineseOrder, emptyFilter, PLACE_ISSUES, SORTS, state, STATUSES, tagsOf } from './state.js';
+import { byChineseOrder, distanceTo, emptyFilter, PLACE_ISSUES, SORTS, state, STATUSES, tagsOf } from './state.js';
 
 const NEAR_RADII_KM = [1, 3, 5];
+const QUICK_RADIUS_KM = 3;
+const NEARBY_KM = 5; // tags of shops this close count as "around here" for the quick picks
+const QUICK_TAG_COUNT = 3;
 const filterDialog = $('filter-dialog');
 const sections = $('filter-sections');
 let onChange = () => {};
@@ -42,18 +45,45 @@ function chosenConditions() {
   ].filter(Boolean);
 }
 
+/** Tags by how many of these places use them, most used first. */
+function tagsByUse(places) {
+  const counts = new Map();
+  for (const tag of places.flatMap(tagsOf)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  return [...counts].sort(([a, countA], [b, countB]) => countB - countA || byChineseOrder(a, b)).map(([tag]) => tag);
+}
+
+// One tap, no sheet: 想吃, 未吃, a range when we know where the person is, and the tags most used by the
+// shops around them (or in the whole list when nothing is close), e.g. 西區美食 when standing in 西區.
+function quickPicks() {
+  const { filter } = state;
+  const nearby = state.places.filter((place) => (distanceTo(place) ?? Infinity) <= NEARBY_KM);
+  const around = nearby.length ? nearby : state.places;
+  const tags = filter.tag ? [] : tagsByUse(around).slice(0, QUICK_TAG_COUNT);
+  return [
+    filter.status !== 'starred' && [STATUSES.starred, () => { filter.status = 'starred'; }],
+    filter.status !== 'todo' && [STATUSES.todo, () => { filter.status = 'todo'; }],
+    state.myPosition && !filter.radius && [`📍 ${QUICK_RADIUS_KM} 公里內`, () => { filter.radius = QUICK_RADIUS_KM; }, { fit: true }],
+    ...tags.map((tag) => [tag, () => { filter.tag = tag; }]),
+  ].filter(Boolean);
+}
+
 export function renderFilterBar() {
   const chosen = chosenConditions();
+  const picks = quickPicks();
   for (const container of [$('filter-chips'), $('map-chips')]) {
     const open = chip(chosen.length ? `⚙️ 篩選・排序 ${chosen.length}` : '⚙️ 篩選・排序', false, openFilterPanel);
     open.removeAttribute('aria-pressed');
     open.setAttribute('aria-haspopup', 'dialog');
     open.classList.add('filter-open');
-    container.replaceChildren(open, ...chosen.map(([label, drop]) => {
-      const button = chip(`${label} ✕`, true, () => change(drop));
-      button.setAttribute('aria-label', `取消「${label}」`);
-      return button;
-    }));
+    container.replaceChildren(
+      open,
+      ...chosen.map(([label, drop]) => {
+        const button = chip(`${label} ✕`, true, () => change(drop));
+        button.setAttribute('aria-label', `取消「${label}」`);
+        return button;
+      }),
+      ...picks.map(([label, pick, options]) => chip(label, false, () => change(pick, options))),
+    );
   }
 }
 
@@ -75,7 +105,7 @@ function renderSections() {
   const issues = Object.entries(PLACE_ISSUES)
     .map(([key, { label, test }]) => [key, label, state.places.filter(test).length])
     .filter(([, , count]) => count);
-  const tags = [...new Set(state.places.flatMap(tagsOf))].sort(byChineseOrder);
+  const tags = tagsByUse(state.places);
   const toggle = (key, value) => () => change(() => { filter[key] = filter[key] === value ? null : value; });
   sections.replaceChildren(...[
     section('排序', Object.entries(SORTS)

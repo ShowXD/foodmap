@@ -46,8 +46,8 @@ export const PLACE_ISSUES = {
   garbled: { label: '疑似亂碼', test: (place) => Boolean(place.garbled?.length) },
   duplicate: { label: '重複', test: (place) => Boolean(place.duplicates?.length) },
 };
-// Same separators as lib/ai.js normalizeTags, so tags saved before it (「#宵夜 ##平價」) read as plain words too.
-export const tagsOf = (place) => [...new Set(String(place.tags ?? '').split(/[\s,，、#＃|｜]+/).filter(Boolean))];
+// Same separators as lib/ai.js normalizeTags, so tags saved before it (「#宵夜 ##平價」、「["台中"」) read as plain words too.
+export const tagsOf = (place) => [...new Set(String(place.tags ?? '').split(/[\s,，、#＃|｜"'“”‘’「」『』\[\]【】()（）]+/).filter(Boolean))];
 
 function distanceKm(from, to) {
   const radians = (degrees) => (degrees * Math.PI) / 180;

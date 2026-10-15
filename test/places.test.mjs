@@ -17,6 +17,7 @@ test('pickFields keeps whitelisted strings and rejects bad input', () => {
   assert.deepEqual(pickFields({ name: 'x'.repeat(501) }), { error: 'name is too long' });
   assert.ok(pickFields({ caption: 'x'.repeat(5000) }).fields);
   assert.deepEqual(pickFields({ tags: ' #宵夜 ##平價，＃台中美食 宵夜 ' }), { fields: { tags: '宵夜 平價 台中美食' } });
+  assert.deepEqual(pickFields({ tags: '["台中", "西區美食"] 「台中」' }), { fields: { tags: '台中 西區美食' } });
   assert.ok(!isHttpUrl(`https://example.com/${'x'.repeat(2048)}`));
 });
 
