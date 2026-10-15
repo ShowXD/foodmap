@@ -1,6 +1,6 @@
 import { findAccessibleList, findAccessiblePlace } from '../../lib/lists.js';
 import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
-import { garbledFields } from '../../lib/ai.js';
+import { garbledFields, normalizeTags } from '../../lib/ai.js';
 import { retryPendingAi } from '../../lib/place-ai.js';
 import { isHttpUrl, MAX_CAPTION_LENGTH } from '../../lib/social.js';
 import { STORAGE_LIMITS, takeUserQuota } from '../../lib/usage.js';
@@ -21,7 +21,7 @@ export function pickFields(body) {
   for (const key of EDITABLE_FIELDS) {
     if (body[key] === undefined) continue;
     if (typeof body[key] !== 'string') return { error: `${key} must be a string` };
-    fields[key] = body[key].trim();
+    fields[key] = key === 'tags' ? normalizeTags(body[key]) : body[key].trim();
     if (fields[key].length > (MAX_FIELD_LENGTH[key] ?? DEFAULT_MAX_FIELD_LENGTH)) return { error: `${key} is too long` };
   }
   if (fields.status !== undefined && !STATUSES.has(fields.status)) {

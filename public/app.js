@@ -133,7 +133,7 @@ function renderPlace(place) {
   card.querySelector('.meta').textContent = [
     distance != null && `📍 ${formatDistance(distance)}`,
     place.area,
-    place.tags,
+    tagsOf(place).join(' '),
     place.source === 'line' && '來自 LINE',
     place.garbled?.length && `⚠️ 疑似亂碼：${place.garbled.map((field) => GARBLED_LABELS[field]).join('、')}`,
     place.duplicates?.length && `🔁 清單裡還有 ${place.duplicates.length} 筆是同一家店`,
@@ -346,7 +346,7 @@ function renderChips() {
         renderPlaces();
         fitToRadius();
       })),
-      ...tags.map((tag) => chip(`#${tag}`, state.filter.tag === tag, () => { state.filter.tag = state.filter.tag === tag ? null : tag; renderPlaces(); })),
+      ...tags.map((tag) => chip(tag, state.filter.tag === tag, () => { state.filter.tag = state.filter.tag === tag ? null : tag; renderPlaces(); })),
     );
   }
 }
@@ -456,7 +456,7 @@ let randomPick = null;
 function renderRandomTags() {
   const chosen = randomTag.value;
   const tags = [...new Set(state.places.flatMap(tagsOf))].sort(byChineseOrder);
-  randomTag.replaceChildren(new Option('全部', ''), ...tags.map((tag) => new Option(`#${tag}`, tag)));
+  randomTag.replaceChildren(new Option('全部', ''), ...tags.map((tag) => new Option(tag, tag)));
   randomTag.value = tags.includes(chosen) ? chosen : '';
 }
 
