@@ -6,6 +6,14 @@ import { onRequest as middleware } from '../functions/_middleware.js';
 import * as link from '../functions/api/link.js';
 import * as lists from '../functions/api/lists.js';
 import * as members from '../functions/api/list-members.js';
+import { readCookie } from '../lib/links.js';
+
+test('readCookie decodes values and ignores a malformed one instead of throwing', () => {
+  const withCookie = (cookie) => new Request('https://example.test/', { headers: { Cookie: cookie } });
+  assert.equal(readCookie(withCookie('a=1; foodmap_link=x%20y'), 'foodmap_link'), 'x y');
+  assert.equal(readCookie(withCookie('foodmap_link=%'), 'foodmap_link'), null);
+  assert.equal(readCookie(withCookie('other=1'), 'foodmap_link'), null);
+});
 
 // Runs a request through the real middleware as `email` (DEV_USER_EMAIL works on localhost only),
 // optionally carrying the link cookie, and lets `handler` act as the route.
