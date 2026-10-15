@@ -116,15 +116,18 @@ export async function retryPendingAi(env, listId, now = new Date()) {
     )
     .bind(listId, room)
     .all();
-  for (const row of claimed) {
-    await recordUsage(env.DB, 'workers_ai', now);
-    const { places = [], error } = await extractPlaces(env.AI, row.caption ?? '');
-    if (error === 'unavailable') {
-      // Cloudflare's own daily limit: put this one back and try again another time.
-      await env.DB.prepare('UPDATE places SET ai_pending = 1 WHERE id = ?').bind(row.id).run();
-      return;
+  const putBack = (ids) => Promise.all(ids.map((id) => env.DB.prepare('UPDATE places SET ai_pending = 1 WHERE id = ?').bind(id).run()));
+  for (const [index, row] of claimed.entries()) {
+    try {
+      await recordUsage(env.DB, 'workers_ai', now);
+      const { places = [], error } = await extractPlaces(env.AI, row.caption ?? '');
+      if (error === 'unavailable') return await putBack(claimed.slice(index).map((rest) => rest.id)); // e.g. Cloudflare's daily limit
+      await fillFromAi(env, row, places);
+    } catch (error) {
+      // Put this and the rest of the claimed links back so a later open tries them again.
+      await putBack(claimed.slice(index).map((rest) => rest.id));
+      throw error;
     }
-    await fillFromAi(env, row, places);
   }
 }
 
