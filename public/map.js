@@ -21,6 +21,10 @@ let dragMarker = null;
 
 function showMapFallback(error) {
   console.error('Map unavailable', error);
+  // Google can reject the key after the map was made (wrong domain, quota used up); its pins then throw,
+  // which would also stop the list from drawing, so the map is dropped altogether.
+  map = null;
+  markers = [];
   $('map').hidden = true;
   $('map-fallback').hidden = false;
   $('map-fallback-text').textContent = `地圖無法使用（${error.message}），清單、定位與今天吃什麼仍可使用。`;
@@ -225,6 +229,7 @@ async function startDrag(place) {
   page.openMapView();
   try {
     await ensureMap();
+    if (!map) throw new Error('map unavailable');
   } catch {
     alert('地圖無法使用，沒辦法放標點');
     return;
@@ -358,7 +363,7 @@ export function panToPlace(place) {
 
 /** After a 幾公里內 chip: show the whole range. */
 export function fitToRadius() {
-  if (radiusCircle?.getMap()) map.fitBounds(radiusCircle.getBounds(), 24);
+  if (map && radiusCircle?.getMap()) map.fitBounds(radiusCircle.getBounds(), 24);
 }
 
 /** A different list: drop any pin being placed and frame the new shops once. */
