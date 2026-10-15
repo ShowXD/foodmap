@@ -79,6 +79,15 @@ async function bindWithCode(db, groupId, code) {
   if (bound) await db.prepare('DELETE FROM line_bind_codes WHERE code = ?').bind(code).run();
 }
 
+// The shops in a post, or none with isAiPending when the AI is out for today (retried later, see place-ai.js).
+async function analysePost(env, listId, caption) {
+  if (!caption || !env.AI) return { places: [], isAiPending: false };
+  if (!(await canUseLineAi(env.DB, listId))) return { places: [], isAiPending: true };
+  await recordUsage(env.DB, 'workers_ai');
+  const { places = [], error } = await extractPlaces(env.AI, caption);
+  return { places, isAiPending: error === 'unavailable' };
+}
+
 async function collectLinks(env, event) {
   const groupId = event.source?.groupId ?? event.source?.roomId;
   if (!groupId) return; // 1:1 chats with the bot are ignored.
@@ -97,18 +106,7 @@ async function collectLinks(env, event) {
     if (seen) continue;
 
     const caption = messageText || (await fetchCaption(url));
-    let places = [];
-    let isAiPending = false;
-    if (caption && env.AI) {
-      if (await canUseLineAi(env.DB, listId)) {
-        await recordUsage(env.DB, 'workers_ai');
-        const extracted = await extractPlaces(env.AI, caption);
-        places = extracted.places ?? [];
-        isAiPending = extracted.error === 'unavailable';
-      } else {
-        isAiPending = true;
-      }
-    }
+    const { places, isAiPending } = await analysePost(env, listId, caption);
     // Never lose a link: if AI found nothing, save the bare link for manual editing (or a later retry).
     const post = { list_id: listId, url, caption, source: 'line', line_message_id: event.message.id };
     if (places.length === 0) await savePlace(env.DB, post, {}, isAiPending);
