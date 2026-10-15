@@ -91,7 +91,9 @@ function showView() {
     document.body.dataset.view = view;
     for (const section of document.querySelectorAll('.view')) section.classList.toggle('is-active', section.dataset.view === view);
     for (const tab of document.querySelectorAll('.tabbar a')) {
-      tab.toggleAttribute('aria-current', tab.dataset.tab === (PARENT_TAB[view] ?? view));
+      // An empty aria-current counts as "false" for screen readers; it has to say which kind of current.
+      if (tab.dataset.tab === (PARENT_TAB[view] ?? view)) tab.setAttribute('aria-current', 'page');
+      else tab.removeAttribute('aria-current');
     }
     window.scrollTo(0, 0);
   };
