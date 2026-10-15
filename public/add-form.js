@@ -154,7 +154,7 @@ addForm.addEventListener('submit', async (event) => {
 export function prefillFromShare() {
   const params = new URLSearchParams(location.search);
   const sharedText = [params.get('url'), params.get('text'), params.get('title')].filter(Boolean).join(' ');
-  const sharedUrl = sharedText.match(/https?:\/\/\S+/)?.[0];
+  const sharedUrl = /https?:\/\/\S+/.exec(sharedText)?.[0];
   if (!sharedUrl) return;
   addForm.elements.url.value = sharedUrl;
   addForm.elements.caption.value = sharedText.replaceAll(sharedUrl, '').trim();
