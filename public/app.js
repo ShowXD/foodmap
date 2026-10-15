@@ -665,6 +665,7 @@ function focusPlace(place) {
 
 // ---- Fixing a position by dragging ----
 async function startDrag(place) {
+  if (dragMarker) endDrag(); // a second drag replaces the first instead of leaving its marker behind
   location.hash = '#map';
   showView(); // starts the map now if it was never opened; hashchange fires too late to await it
   try {
@@ -1047,6 +1048,7 @@ function switchToList(listId) {
   selectList(listId);
   resetForm();
   hideMapCard();
+  if (dragMarker) endDrag(); // the shop being placed belongs to the list being left
   hasFittedMap = false;
   loadPlaces({ markRead: true });
 }
