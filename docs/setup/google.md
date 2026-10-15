@@ -36,6 +36,7 @@ Google 條款規定：
 **API 和服務** → **程式庫**，搜尋並啟用：
 - **Maps JavaScript API**
 - **Places API (New)**：要選有「(New)」的，不要選舊版的「Places API」。
+- （選用）**YouTube Data API v3**：讓 AI 讀到 YouTube 影片的完整說明欄和熱門留言（網頁摘要只有開頭一段）。免費、不用帳單，每天 10,000 單位，讀一支影片約 2 單位。沒啟用也能用，只是只讀得到網頁摘要。
 
 ## 3. 建立兩把 API 金鑰
 
