@@ -94,18 +94,17 @@ export async function onRequestPost({ request, env, data }) {
   const source = SOURCES.includes(body.source) ? body.source : 'manual';
 
   // One video can feature several shops, so a duplicate is the same url *and* the same shop name in the same list.
-  const existing = await env.DB
-    .prepare("SELECT * FROM places WHERE list_id = ? AND url = ? AND COALESCE(name, '') = ?")
-    .bind(list.id, url, fields.name ?? '')
-    .first();
-  if (existing) return json({ error: 'already saved', place: existing }, 409);
-
+  // Checked inside the INSERT so a double-tapped save can't slip two rows in between a check and the insert.
   const columns = ['list_id', 'created_by', 'url', 'source', ...Object.keys(fields)];
   const values = [list.id, data.user.id, url, source, ...Object.values(fields)];
   const place = await env.DB
-    .prepare(`INSERT INTO places (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')}) RETURNING *`)
-    .bind(...values)
+    .prepare(
+      `INSERT INTO places (${columns.join(', ')}) SELECT ${columns.map(() => '?').join(', ')}
+       WHERE NOT EXISTS (SELECT 1 FROM places WHERE list_id = ? AND url = ? AND COALESCE(name, '') = ?) RETURNING *`,
+    )
+    .bind(...values, list.id, url, fields.name ?? '')
     .first();
+  if (!place) return json({ error: 'already saved' }, 409);
   return json(place, 201);
 }
 
