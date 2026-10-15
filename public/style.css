@@ -383,6 +383,48 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 .list-picker { display: flex; gap: 8px; margin-bottom: 10px; }
 .list-picker select { flex: 1; min-width: 0; font-weight: 600; }
 .list-picker .icon-button { padding: 0; color: var(--text); }
+/* The ⋯ menu next to the list picker (a native popover: closes on outside tap and Esc). */
+.popover-menu {
+  inset: auto;
+  top: calc(env(safe-area-inset-top) + 64px);
+  right: 16px;
+  margin: 0;
+  padding: 6px;
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+.popover-menu a, .popover-menu button {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+.popover-menu a[hidden] { display: none; }
+.popover-menu a:hover, .popover-menu button:hover { background: var(--accent-soft); }
+/* ---- 篩選與排序: a sheet from the bottom ---- */
+.chip.filter-open { font-weight: 600; }
+dialog.sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 85dvh;
+  margin: auto auto 0;
+  border-radius: 16px 16px 0 0;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+}
+.filter-sections { display: grid; gap: 14px; margin-bottom: 16px; }
+.filter-sections h3 { margin: 0 0 6px; font-size: 0.9rem; color: var(--muted); }
+.filter-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.filter-options .meta { margin: 0; }
 #group-form { display: grid; gap: 12px; }
 #group-form p { margin: 0; }
 .leave-group { margin-top: 16px; }

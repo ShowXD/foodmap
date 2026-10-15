@@ -132,7 +132,7 @@ export function renderMarkers() {
 // The 幾公里內 filter draws its range around the person's position.
 let radiusCircle = null;
 function renderRadius() {
-  if (!map || !state.myPosition || state.filter.mode !== 'near') {
+  if (!map || !state.myPosition || !state.filter.radius) {
     radiusCircle?.setMap(null);
     return;
   }

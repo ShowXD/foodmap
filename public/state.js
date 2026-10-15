@@ -12,11 +12,17 @@ function savedPinStyle() {
   }
 }
 
+// Each part narrows on its own and they combine (e.g. 未吃 within 3 公里 tagged 宵夜).
+export function emptyFilter() {
+  return { status: 'all', radius: null, issue: null, tag: null };
+}
+
 export const state = {
   lists: [],
   currentListId: null,
   places: [],
-  filter: { mode: 'all', tag: null, radius: undefined },
+  filter: emptyFilter(),
+  sort: 'newest', // see SORTS
   search: '', // the list's search box, lower-cased
   myPosition: null,
   myAccuracy: null, // metres, as reported by the browser
@@ -58,14 +64,27 @@ function matchesSearch(place) {
   return !state.search || SEARCH_FIELDS.some((field) => String(place[field] ?? '').toLowerCase().includes(state.search));
 }
 
+export const STATUSES = { all: '全部', todo: '未吃', visited: '吃過', starred: '★ 想吃' };
+
 export function matchesFilter(place) {
   const { filter } = state;
   if (!matchesSearch(place)) return false;
-  if (filter.mode === 'todo' && place.my_visited_at) return false;
-  if (filter.mode === 'visited' && !place.my_visited_at) return false;
-  if (filter.mode === 'starred' && !place.starred) return false;
-  if (PLACE_ISSUES[filter.mode] && !PLACE_ISSUES[filter.mode].test(place)) return false;
-  if (filter.mode === 'near' && !(distanceTo(place) != null && distanceTo(place) <= filter.radius)) return false;
+  if (filter.status === 'todo' && place.my_visited_at) return false;
+  if (filter.status === 'visited' && !place.my_visited_at) return false;
+  if (filter.status === 'starred' && !place.starred) return false;
+  if (filter.issue && !PLACE_ISSUES[filter.issue].test(place)) return false;
+  if (filter.radius && !(distanceTo(place) != null && distanceTo(place) <= filter.radius)) return false;
   if (filter.tag && !tagsOf(place).includes(filter.tag)) return false;
   return true;
 }
+
+// Tags and names are mostly Chinese; plain sort() orders by code unit, which looks random to people.
+export const byChineseOrder = (a, b) => a.localeCompare(b, 'zh-Hant');
+// Places without the sort key (no name, not located) go last. The server sends newest first.
+export const SORTS = {
+  newest: { label: '新到舊', compare: () => 0 },
+  oldest: { label: '舊到新', compare: (a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id },
+  name: { label: '店名', compare: (a, b) => (!a.name - !b.name) || byChineseOrder(a.name, b.name) },
+  distance: { label: '距離', compare: (a, b) => (distanceTo(a) ?? Infinity) - (distanceTo(b) ?? Infinity) },
+};
+export const sortPlaces = (places) => [...places].sort(SORTS[state.sort].compare);

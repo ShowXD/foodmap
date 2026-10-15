@@ -1,19 +1,19 @@
 import { prefillFromShare, resetForm, startEdit } from './add-form.js';
 import { showAdmin } from './admin.js';
+import { connectFilters, renderFilterBar } from './filters.js';
 import './me.js';
 import { showMembers } from './members.js';
 import {
-  connectMap, ensureMap, fitToRadius, openLocateDialog, panToPlace, renderMarkers, resetMapForNewList, watchMyPosition,
+  connectMap, ensureMap, openLocateDialog, panToPlace, renderMarkers, resetMapForNewList, watchMyPosition,
 } from './map.js';
 import { $, api, openDialog, readSetting, saveSetting } from './shared.js';
 import {
-  distanceTo, formatDistance, isLocated, mapsUrl, matchesFilter, PLACE_ISSUES, state, tagsOf,
+  byChineseOrder, distanceTo, emptyFilter, formatDistance, isLocated, mapsUrl, matchesFilter, PLACE_ISSUES, sortPlaces, state, tagsOf,
 } from './state.js';
 
 const searchInput = $('search');
 const placeList = $('place-list');
 const listMessage = $('list-message');
-const filterChips = $('filter-chips');
 const placeTemplate = $('place-template');
 const listSelect = $('list-select');
 const visitDialog = $('visit-dialog');
@@ -23,7 +23,6 @@ const VIEWS = ['map', 'list', 'add', 'random', 'me', 'members', 'usage', 'groups
 const LIST_STORAGE_KEY = 'foodmap.list';
 const LAYOUT_STORAGE_KEY = 'foodmap.layout';
 
-const NEAR_RADII_KM = [1, 3, 5];
 let layout = readSetting(LAYOUT_STORAGE_KEY) === 'grid' ? 'grid' : 'rows';
 // ---- Views (hash routing keeps the phone's back button working) ----
 let currentView = null;
@@ -315,47 +314,10 @@ visitDialog.addEventListener('close', async () => {
   }
 });
 
-// ---- Filters ----
-function chip(label, isActive, onClick) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'chip';
-  button.textContent = label;
-  button.setAttribute('aria-pressed', String(isActive));
-  button.addEventListener('click', onClick);
-  return button;
-}
-
-// Tags are mostly Chinese; plain sort() orders by code unit, which looks random to people.
-const byChineseOrder = (a, b) => a.localeCompare(b, 'zh-Hant');
-
-function renderChips() {
-  const modes = [['all', '全部'], ['todo', '未吃'], ['visited', '吃過'], ['starred', '★ 想吃']];
-  if (state.myPosition) modes.splice(1, 0, ...NEAR_RADII_KM.map((km) => ['near', `📍 ${km} 公里`, km]));
-  for (const [mode, { label, test }] of Object.entries(PLACE_ISSUES)) {
-    const count = state.places.filter((place) => test(place)).length;
-    if (count) modes.push([mode, `${label} ${count}`]);
-  }
-  const tags = [...new Set(state.places.flatMap(tagsOf))].sort(byChineseOrder);
-  // The list and the map share one filter, so both rows show the same chips.
-  for (const container of [filterChips, $('map-chips')]) {
-    container.replaceChildren(
-      ...modes.map(([mode, label, radius]) => chip(label, state.filter.mode === mode && state.filter.radius === radius, () => {
-        state.filter.mode = mode;
-        state.filter.radius = radius;
-        renderPlaces();
-        fitToRadius();
-      })),
-      ...tags.map((tag) => chip(tag, state.filter.tag === tag, () => { state.filter.tag = state.filter.tag === tag ? null : tag; renderPlaces(); })),
-    );
-  }
-}
-
 function renderPlaces() {
   renderRandomTags();
-  renderChips();
-  const shown = state.places.filter(matchesFilter);
-  if (state.filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
+  renderFilterBar();
+  const shown = sortPlaces(state.places.filter(matchesFilter));
   renderMarkers();
   refreshMapCard();
   refreshRandomPick();
@@ -364,9 +326,10 @@ function renderPlaces() {
     button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
   }
   placeList.replaceChildren(...shown.map((place) => renderListItem(place, layout)));
-  const waitingForAi = reanalyzeTargets().length;
+  // Offered once a 待處理 condition is chosen, so it doesn't sit above the list all the time.
+  const waitingForAi = state.filter.issue ? reanalyzeTargets().length : 0;
   reanalyzeAllButton.hidden = !waitingForAi;
-  const scope = PLACE_ISSUES[state.filter.mode]?.label ?? '沒店名或疑似亂碼';
+  const scope = PLACE_ISSUES[state.filter.issue]?.label;
   if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 「${scope}」的 ${waitingForAi} 家全部 AI 重新分析`;
   if (shown.length) listMessage.textContent = '';
   else if (!state.places.length) listMessage.textContent = '還沒有收藏，按下方＋新增一家吧';
@@ -447,6 +410,7 @@ connectMap({
   onFirstPosition: renderPlaces,
   reloadPlaces: loadPlaces,
 });
+connectFilters(renderPlaces);
 
 // ---- 今天吃什麼 ----
 const randomTag = $('random-tag');
@@ -502,7 +466,7 @@ function selectList(listId) {
   $('members-link').hidden = Boolean(list.is_personal);
   $('members-link').href = `#members?list=${list.id}`;
   $('export-link').href = `/api/export?list=${list.id}`;
-  state.filter = { mode: 'all', tag: null };
+  state.filter = emptyFilter();
   saveSetting(LIST_STORAGE_KEY, String(list.id));
 }
 
@@ -525,6 +489,11 @@ listSelect.addEventListener('change', () => switchToList(Number(listSelect.value
 // ---- Starting a group ----
 const groupDialog = $('group-dialog');
 const groupForm = $('group-form');
+
+// Picking anything in the ⋯ menu closes it (a link to #members would otherwise leave it open over the page).
+$('list-menu').addEventListener('click', (event) => {
+  if (event.target.closest('a, button')) $('list-menu').hidePopover();
+});
 
 $('new-group').addEventListener('click', () => {
   groupForm.reset();

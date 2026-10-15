@@ -18,7 +18,7 @@
         <p class="big-emoji" aria-hidden="true">🗺️</p>
         <p id="map-fallback-text">地圖載入中…</p>
       </div>
-      <div id="map-chips" class="chips map-chips" role="group" aria-label="地圖篩選"></div>
+      <div id="map-chips" class="chips map-chips" role="group" aria-label="目前的篩選"></div>
       <div id="drag-bar" class="map-sheet drag-bar" hidden>
         <p>拖曳標點，或點地圖，把位置放到店家門口</p>
         <div class="actions">
@@ -39,9 +39,12 @@
     <section class="view" data-view="list" aria-label="清單">
       <div class="list-picker">
         <select id="list-select" aria-label="切換清單"></select>
-        <button id="new-group" type="button" class="icon-button" aria-label="建立群組" title="建立群組">＋</button>
-        <a id="members-link" class="icon-button" href="#members" aria-label="群組成員" title="群組成員" hidden>👥</a>
-        <a id="export-link" class="icon-button" href="/api/export" download aria-label="匯出這份清單（CSV）" title="匯出 CSV">⬇️</a>
+        <button type="button" class="icon-button" popovertarget="list-menu" aria-label="清單選單" title="清單選單">⋯</button>
+      </div>
+      <div id="list-menu" class="popover-menu" popover>
+        <button id="new-group" type="button">＋ 建立群組</button>
+        <a id="members-link" href="#members" hidden>👥 群組成員與邀請</a>
+        <a id="export-link" href="/api/export" download>⬇️ 匯出這份清單（CSV）</a>
       </div>
       <div class="list-tools">
         <input id="search" type="search" placeholder="搜尋店名、食物、地區、標籤…" aria-label="搜尋">
@@ -50,7 +53,7 @@
           <button type="button" data-layout="grid" aria-label="縮圖">▦</button>
         </div>
       </div>
-      <div id="filter-chips" class="chips" role="group" aria-label="篩選"></div>
+      <div id="filter-chips" class="chips" role="group" aria-label="目前的篩選"></div>
       <button id="reanalyze-all" type="button" class="secondary" hidden></button>
       <output id="list-message"></output>
       <ul id="place-list" class="place-rows"></ul>
@@ -256,6 +259,17 @@
         <button value="save">儲存</button>
         <button value="remove" class="secondary" id="visit-remove">取消吃過</button>
         <button value="cancel" class="secondary" formnovalidate>關閉</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="filter-dialog" class="sheet" aria-labelledby="filter-title">
+    <form method="dialog">
+      <h2 id="filter-title">篩選與排序</h2>
+      <div id="filter-sections" class="filter-sections"></div>
+      <div class="actions">
+        <button value="done">完成</button>
+        <button id="filter-clear" type="button" class="secondary">全部清除</button>
       </div>
     </form>
   </dialog>
