@@ -1,5 +1,5 @@
 // 'pending' only exists in old rows (approval was removed); the middleware treats it as blocked.
-const STATUSES = ['approved', 'disabled'];
+const STATUSES = new Set(['approved', 'disabled']);
 const json = (body, status = 200) => Response.json(body, { status });
 const forbidden = () => json({ error: 'admin only' }, 403);
 
@@ -24,7 +24,7 @@ export async function onRequestPatch({ request, env, data }) {
 
   const updates = {};
   if (body.status !== undefined) {
-    if (!STATUSES.includes(body.status)) return json({ error: 'invalid status' }, 400);
+    if (!STATUSES.has(body.status)) return json({ error: 'invalid status' }, 400);
     updates.status = body.status;
   }
   if (body.is_admin !== undefined) {

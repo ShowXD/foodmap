@@ -4,8 +4,8 @@ import { retryPendingAi } from '../../lib/place-ai.js';
 import { isHttpUrl, MAX_CAPTION_LENGTH } from '../../lib/social.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
-const SOURCES = ['line', 'share', 'manual'];
-const STATUSES = ['todo', 'visited'];
+const SOURCES = new Set(['line', 'share', 'manual']);
+const STATUSES = new Set(['todo', 'visited']);
 // Caps keep one row small; captions mirror the AI extraction limit.
 const MAX_FIELD_LENGTH = { caption: MAX_CAPTION_LENGTH, note: 2000 };
 const DEFAULT_MAX_FIELD_LENGTH = 500;
@@ -21,7 +21,7 @@ export function pickFields(body) {
     fields[key] = body[key].trim();
     if (fields[key].length > (MAX_FIELD_LENGTH[key] ?? DEFAULT_MAX_FIELD_LENGTH)) return { error: `${key} is too long` };
   }
-  if (fields.status !== undefined && !STATUSES.includes(fields.status)) {
+  if (fields.status !== undefined && !STATUSES.has(fields.status)) {
     return { error: 'invalid status' };
   }
   return { fields };
@@ -76,7 +76,7 @@ export async function onRequestPost({ request, env, data }) {
   if (!list) return listNotFound();
   const { fields, error } = pickFields(body);
   if (error) return json({ error }, 400);
-  const source = SOURCES.includes(body.source) ? body.source : 'manual';
+  const source = SOURCES.has(body.source) ? body.source : 'manual';
 
   // One video can feature several shops, so a duplicate is the same url *and* the same shop name in the same list.
   // Checked inside the INSERT so a double-tapped save can't slip two rows in between a check and the insert.
