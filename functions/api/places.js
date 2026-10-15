@@ -1,4 +1,4 @@
-import { findAccessibleList } from '../../lib/lists.js';
+import { findAccessibleList, findAccessiblePlace } from '../../lib/lists.js';
 import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
 import { retryPendingAi } from './line/webhook.js';
 
@@ -117,8 +117,7 @@ export async function onRequestPatch({ request, env, data }) {
   if (keys.length === 0) return json({ error: 'nothing to update' }, 400);
 
   // Report "not found" for places in lists the user can't see, so ids don't leak.
-  const current = await env.DB.prepare('SELECT list_id FROM places WHERE id = ?').bind(body.id).first();
-  if (!current || !(await findAccessibleList(env.DB, data.user, current.list_id))) return json({ error: 'not found' }, 404);
+  if (!(await findAccessiblePlace(env.DB, data.user, body.id))) return json({ error: 'not found' }, 404);
 
   const place = await env.DB
     // Once a person edits it, the background AI retry leaves it alone.
