@@ -269,7 +269,7 @@ curl -si -X POST https://<專案>.pages.dev/api/line/webhook | head -5
   - `X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: same-origin`。
   - `/api/*` 另外加上 `Cache-Control: no-store`。
   - 之後接 Google 地圖時，要在 CSP 加上 Google 的網域。
-- AI 擷取每人每天上限 30 次，記在 `extract_usage` 表，避免一個帳號用光全家的免費額度。抓貼文時若被轉址到非 IG/FB 網域就不讀，最多只讀 512 KB。
+- AI 擷取每人每天上限 30 次，記在 `user_daily_usage` 表，避免一個帳號用光全家的免費額度。抓貼文時若被轉址到非 IG/FB 網域就不讀，最多只讀 512 KB。
 - 店家欄位有長度上限：一般欄位 500 字、備註 2000 字、貼文文字 5000 字、網址 2048 字、搜尋字串 100 字。
 - 清單權限在 `lib/lists.js`：
   - 個人清單只有本人能用，**網站管理員也看不到**。
@@ -326,7 +326,7 @@ npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
 | `0002_multi_place.sql` | 一則影片可以存多家店（拿掉網址不可重複的限制，資料保留） | 2026-10-12 以前用 `schema.sql` 建的資料庫 |
 | `0003_users.sql` | 新增 `users` 表（個人帳號） | 還沒有 `users` 表的資料庫 |
 | `0004_lists.sql` | 個人清單與群組清單；舊店家搬進「家人」群組；取消審核 | 跑過 0003、還沒有 `lists` 表的資料庫 |
-| `0005_extract_usage.sql` | AI 擷取每人每日次數紀錄（上限 30 次） | 還沒有 `extract_usage` 表的資料庫 |
+| `0005_extract_usage.sql` | （已停用，由 0012 的 `user_daily_usage` 取代） | 不用跑；已經有這張表也不影響 |
 | `0006_line.sql` | LINE Bot：記錄店家來自哪則 LINE 訊息、Bot 加入的群組 | 還沒有 `line_groups` 表的資料庫 |
 | `0007_personal.sql` | 每人各自的「吃過」評分、想吃星號、「新」標示 | 還沒有 `place_visits` 表的資料庫 |
 | `0008_location.sql` | 店家在地圖上的位置（Google 地點 ID、座標） | `places` 還沒有 `lat` 欄位的資料庫 |

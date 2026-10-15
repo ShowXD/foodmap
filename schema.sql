@@ -95,14 +95,6 @@ CREATE TABLE IF NOT EXISTS list_reads (
   PRIMARY KEY (user_id, list_id)
 );
 
--- Per-user daily AI extraction count (day = UTC YYYY-MM-DD) to protect the shared free quota.
-CREATE TABLE IF NOT EXISTS extract_usage (
-  user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  day TEXT NOT NULL,
-  count INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (user_id, day)
-);
-
 -- Video preview images (og:image) copied once, since IG/FB image links expire; image NULL = fetch failed.
 CREATE TABLE IF NOT EXISTS place_thumbnails (
   place_id INTEGER PRIMARY KEY REFERENCES places (id) ON DELETE CASCADE,
