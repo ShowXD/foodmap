@@ -1,7 +1,7 @@
 import { showAdmin } from './admin.js';
 import { showMembers } from './members.js';
+import { $, api, openDialog, readSetting, saveSetting } from './shared.js';
 
-const $ = (id) => document.getElementById(id);
 const searchInput = $('search');
 const placeList = $('place-list');
 const listMessage = $('list-message');
@@ -46,26 +46,6 @@ function distanceKm(from, to) {
 }
 const distanceTo = (place) => (myPosition && isLocated(place) ? distanceKm(myPosition, place) : null);
 const formatDistance = (km) => (km < 1 ? `${Math.round(km * 1000)} 公尺` : `${km.toFixed(1)} 公里`);
-
-async function api(method, body, query = '', path = '/api/places') {
-  const response = await fetch(`${path}${query}`, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  // 401: the Access session expired, so reloading sends the browser through the Access login.
-  if (response.status === 401) {
-    location.reload();
-    throw new Error('請重新登入');
-  }
-  const payload = await response.json().catch(() => ({}));
-  if (response.status === 403 && payload.error === 'account disabled') {
-    location.href = '/pending';
-    throw new Error('帳號已停用');
-  }
-  if (!response.ok) throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), { status: response.status });
-  return payload;
-}
 
 // ---- Views (hash routing keeps the phone's back button working) ----
 let currentView = null;
@@ -274,13 +254,6 @@ async function sharePlace(place) {
   } catch (error) {
     if (error.name !== 'AbortError') alert(`分享失敗：${error.message}`);
   }
-}
-
-// Esc keeps the dialog's previous returnValue, so without this it would redo the last choice
-// (e.g. delete this shop's 吃過 because another shop's dialog was last closed with 取消吃過).
-function openDialog(dialog) {
-  dialog.returnValue = '';
-  dialog.showModal();
 }
 
 // ---- 吃過 + rating dialog ----
@@ -1002,23 +975,6 @@ function prefillFromShare() {
 }
 
 // ---- Lists and "我的" ----
-// Remembering the last list is a convenience; storage can be blocked (private mode), so failures just fall back.
-function readSetting(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function saveSetting(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Not remembering the choice is fine.
-  }
-}
-
 function selectList(listId) {
   const list = lists.find((candidate) => candidate.id === listId) ?? lists[0];
   currentListId = list.id;
