@@ -202,6 +202,9 @@
   - 後端：`/api/places` POST 重複檢查改在同一句 INSERT（雙擊不會存兩筆；409 不再附 `place`）；PATCH 改用 `findAccessiblePlace`；`readCookie` 遇到格式錯誤的 cookie 回 null（原本整站 500）；`retryPendingAi` 出錯時把已認領的列標回 `ai_pending=1`；`schema.sql` 移除不再使用的 `extract_usage`（正式 DB 的表留著無害，未 DROP）；`cloudflare.md` 更正為 `user_daily_usage`
   - 刻意不做：16 個檔案各自的 `json()` 一行 helper 不合併；社群頁轉址改 `redirect: 'manual'`（目前抓完會再檢查網域，風險低）；`/api/places` 回傳完整 caption（清單破百筆再改成只回 has_caption）
   - 搜尋改在前端（使用者決定「今天吃什麼」永遠從整個清單抽，要縮小範圍用標籤）：`/api/places` 一律回傳整個清單（移除 `q` 參數與 LIKE 查詢）；`app.js` `matchesSearch` 比對店名、食物、地區、地址、標籤、備註、貼文文字，只影響清單與地圖；「今天吃什麼」與標籤選單用整個清單。打字不再發請求。本機驗證：搜尋「牛肉」清單剩 1 家、吃什麼仍從 6 家抽
+- **SonarQube 問題處理（2026-10-15）**：VS Code 的 SonarQube 只回報已開啟的檔案，改用相同規則在命令列掃全專案（SonarJS recommended＋SonarQube 收錄的 no-await-in-loop、no-floating-promises、unicorn prefer-top-level-await／prefer-set-has／prefer-code-point，工具裝在暫存資料夾，未加入專案依賴）。79 筆 → 修 45 筆，剩 40 筆評估後不修：
+  - 已修：允許值改 Set；巢狀樣板字串／三元抽成具名變數；標籤依中文筆畫排序（`localeCompare('zh-Hant')`）；用量取最早日期改 reduce；正規表示式改 `exec`／`\d`，地址比對路名限 20 字避免回溯；`codePointAt`／`fromCodePoint`；`collectLinks` 抽出 `analysePost`（認知複雜度 17→15 以下）；不等待的 Promise 標 `void`，拖曳圖釘失敗改為提示；啟動流程與 `pending.js` 改 top-level await
+  - 不修（理由）：`no-await-in-loop` 27 筆＝刻意依序（Google 配額、LINE 訊息順序、AI 一次一則、測試）；`pseudo-random` 2 筆＝今天吃什麼抽籤與測試，非安全用途；`no-intrusive-permissions`＝定位就是功能本身；`prefer-top-level-await` 2 筆＝`me.js` 與 Service Worker 註冊若 await 會擋住 App 啟動；`code-eval`／`no-clear-text-protocols` 5 筆＝測試刻意用 `javascript:`／`http:` 驗證會被拒絕；`slow-regex` 1 筆＝`access.js` 處理的是自己設定的網域；`no-extra-arguments` 1 筆＝測試中 `googleReply` 之後會換成吃網址參數的版本（誤判）
 - **前端拆檔（2026-10-15）**：`app.js` 由 1,315 行拆為（單向依賴、無循環）：
   - `shared.js`：`$`、`api`、`readSetting`/`saveSetting`、`openDialog`、`notify`（發 `foodmap:<name>` 事件）
   - `state.js`：共用資料 `state`（lists、currentListId、places、filter、search、myPosition、myAccuracy、locationError、pinStyle）與純函式（`matchesFilter`、`distanceTo`、`isLocated`…）
