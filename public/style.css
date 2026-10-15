@@ -46,7 +46,7 @@ header {
 }
 header > a { color: var(--accent); }
 h1 { margin: 0 0 8px; font-size: 1.25rem; color: var(--accent); }
-main { max-width: 640px; margin: 0 auto; padding: 16px; }
+main { max-width: 640px; margin: 0 auto; padding: 16px; view-transition-name: page; }
 
 input, textarea, select, button {
   font: inherit;
@@ -65,6 +65,8 @@ input:read-only { color: var(--muted); }
 label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
 
 .meta { color: var(--muted); font-size: 0.9rem; }
+/* Status messages are <output> (announced by screen readers); lay them out like the paragraphs they replaced. */
+output { display: block; margin-block: 1em; }
 #list-message, #form-message { color: var(--muted); margin: 8px 0; }
 
 /* ---- App shell: views and the bottom tab bar (no top bar; content starts below the phone's status bar) ---- */
@@ -80,9 +82,7 @@ body > main {
 body:not([data-view="map"]) .view[data-view="map"] { display: block; position: fixed; inset: 0; visibility: hidden; }
 .view-title { font-size: 1.15rem; margin: 0 0 12px; }
 
-/* Switching tabs: the page slides while the top bar and tab bar stay put (View Transitions API). */
-main { view-transition-name: page; }
-.tabbar { view-transition-name: tabbar; }
+/* Switching tabs: the page (main) slides while the tab bar stays put; both are named in their own rules. */
 ::view-transition-old(page),
 ::view-transition-new(page) { animation-duration: 220ms; animation-timing-function: ease-out; }
 html[data-direction="forward"]::view-transition-old(page) { animation-name: slide-to-left; }
@@ -102,6 +102,7 @@ html[data-direction="back"]::view-transition-new(page) { animation-name: slide-f
 @keyframes pop-in { from { transform: scale(0.96); opacity: 0; } }
 
 .tabbar {
+  view-transition-name: tabbar;
   position: fixed;
   left: 0;
   right: 0;
