@@ -39,9 +39,11 @@ export async function authenticatedEmail(request, env) {
   return payload ? payload.email.trim().toLowerCase() : null;
 }
 
-// Blocks cross-site form/fetch submissions riding on the Access cookie (CSRF).
+// Blocks cross-site requests riding on the Access cookie: any write (CSRF), and any API call at all, since
+// only the app itself calls the API and some reads count against the person's quota (/api/config).
+// Pages stay reachable from other sites so links (e.g. from LINE) still open the app.
 export function isCrossSiteWrite(request) {
-  if (SAFE_METHODS.has(request.method)) return false;
+  if (SAFE_METHODS.has(request.method) && !new URL(request.url).pathname.startsWith('/api/')) return false;
   const fetchSite = request.headers.get('Sec-Fetch-Site');
   if (fetchSite && fetchSite !== 'same-origin') return true;
   const origin = request.headers.get('Origin');

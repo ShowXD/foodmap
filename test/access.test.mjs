@@ -163,8 +163,12 @@ test('middleware blocks cross-site writes but allows same-origin ones', async ()
   assert.equal((await runMiddleware(url, env, { 'Sec-Fetch-Site': 'same-site' }, 'DELETE')).response.status, 403);
   assert.ok((await runMiddleware(url, env, { 'Sec-Fetch-Site': 'same-origin', Origin: 'http://localhost:8788' }, 'POST')).passed);
   assert.ok((await runMiddleware(url, env, {}, 'POST')).passed);
-  // Reads stay allowed so links from other sites (e.g. LINE) still open the app.
+  // Pages stay reachable so links from other sites (e.g. LINE) still open the app...
   assert.ok((await runMiddleware('http://localhost:8788/', env, { 'Sec-Fetch-Site': 'cross-site' })).passed);
+  // ...but API reads from another site are refused too (e.g. an <img> burning the map quota via /api/config).
+  assert.equal((await runMiddleware('http://localhost:8788/api/config', env, { 'Sec-Fetch-Site': 'cross-site' })).response.status, 403);
+  assert.ok((await runMiddleware('http://localhost:8788/api/config', env, { 'Sec-Fetch-Site': 'same-origin' })).passed);
+  assert.ok((await runMiddleware('http://localhost:8788/api/config', env)).passed);
 });
 
 test('every response carries security headers and API responses are not cached', async () => {
