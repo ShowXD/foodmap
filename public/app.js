@@ -385,17 +385,23 @@ function renderPlaces() {
   else listMessage.textContent = query ? '找不到符合的店' : '還沒有收藏，按下方＋新增一家吧';
 }
 
+let placesLoad = 0;
 async function loadPlaces({ markRead = false } = {}) {
   if (!currentListId) return;
   const query = searchInput.value.trim();
+  // Switching lists or typing while a load is in flight: only the newest answer may be drawn,
+  // or an older list's shops would show (and be edited) under the newly chosen list.
+  const thisLoad = ++placesLoad;
   listMessage.textContent = '載入中…';
   try {
-    places = await api('GET', null, `?list=${currentListId}${query ? `&q=${encodeURIComponent(query)}` : ''}`);
+    const loaded = await api('GET', null, `?list=${currentListId}${query ? `&q=${encodeURIComponent(query)}` : ''}`);
+    if (thisLoad !== placesLoad) return;
+    places = loaded;
     renderPlaces();
     // Remember this visit so places added afterwards show as "新" next time.
     if (markRead) api('POST', { list_id: currentListId }, '', '/api/list-read').catch((error) => console.error('list-read failed', error));
   } catch (error) {
-    listMessage.textContent = `載入失敗：${error.message}`;
+    if (thisLoad === placesLoad) listMessage.textContent = `載入失敗：${error.message}`;
   }
 }
 
