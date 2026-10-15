@@ -299,7 +299,7 @@ export function openLocateDialog(place) {
     locateMessage.textContent = '輸入完整地址（例如：台北市大安區復興南路一段 1 號）或店名，再按搜尋';
     locateForm.elements.query.focus();
   } else if (place.name) {
-    searchLocation();
+    void searchLocation(); // reports its own errors in the dialog
   } else {
     locateMessage.textContent = '還沒有店名，請輸入店名或完整地址';
   }
@@ -349,13 +349,15 @@ async function chooseLocation(place, candidate) {
 locateForm.addEventListener('submit', (event) => {
   if (event.submitter?.value !== 'search') return;
   event.preventDefault();
-  searchLocation();
+  void searchLocation();
 });
 
 locateDialog.addEventListener('close', () => {
   const place = locatingPlace;
   locatingPlace = null;
-  if (place && locateDialog.returnValue === 'manual') startDrag(place);
+  if (place && locateDialog.returnValue === 'manual') {
+    startDrag(place).catch((error) => alert(`沒辦法放標點：${error.message}`));
+  }
 });
 
 

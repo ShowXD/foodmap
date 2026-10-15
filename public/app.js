@@ -474,7 +474,7 @@ function switchToList(listId) {
   resetForm();
   hideMapCard();
   resetMapForNewList();
-  loadPlaces({ markRead: true });
+  void loadPlaces({ markRead: true }); // shows its own error in the list
 }
 
 listSelect.addEventListener('change', () => switchToList(Number(listSelect.value)));
