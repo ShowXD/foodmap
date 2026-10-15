@@ -286,12 +286,15 @@ function chip(label, isActive, onClick) {
   return button;
 }
 
+// Tags are mostly Chinese; plain sort() orders by code unit, which looks random to people.
+const byChineseOrder = (a, b) => a.localeCompare(b, 'zh-Hant');
+
 function renderChips() {
   const untidy = state.places.filter(needsTidying).length;
   const modes = [['all', '全部'], ['todo', '未吃'], ['visited', '吃過'], ['starred', '★ 想吃']];
   if (state.myPosition) modes.splice(1, 0, ...NEAR_RADII_KM.map((km) => ['near', `📍 ${km} 公里`, km]));
   if (untidy) modes.push(['untidy', `待整理 ${untidy}`]);
-  const tags = [...new Set(state.places.flatMap(tagsOf))].sort();
+  const tags = [...new Set(state.places.flatMap(tagsOf))].sort(byChineseOrder);
   // The list and the map share one filter, so both rows show the same chips.
   for (const container of [filterChips, $('map-chips')]) {
     container.replaceChildren(
@@ -409,7 +412,7 @@ let randomPick = null;
 
 function renderRandomTags() {
   const chosen = randomTag.value;
-  const tags = [...new Set(state.places.flatMap(tagsOf))].sort();
+  const tags = [...new Set(state.places.flatMap(tagsOf))].sort(byChineseOrder);
   randomTag.replaceChildren(new Option('全部', ''), ...tags.map((tag) => new Option(`#${tag}`, tag)));
   randomTag.value = tags.includes(chosen) ? chosen : '';
 }
