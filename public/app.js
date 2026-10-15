@@ -1075,8 +1075,12 @@ groupForm.addEventListener('submit', async (event) => {
 
 // members.js fires this after someone leaves a group, so the list menu drops it.
 window.addEventListener('foodmap:lists-changed', async () => {
-  await loadLists();
-  switchToList(currentListId);
+  try {
+    await loadLists();
+    switchToList(currentListId);
+  } catch (error) {
+    listMessage.textContent = `清單更新失敗，請重新整理：${error.message}`;
+  }
 });
 
 // ---- Profile: name and photo shown on 我的 and on the tab ----
