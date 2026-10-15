@@ -3,7 +3,6 @@ import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
 import * as lists from '../functions/api/lists.js';
-import * as members from '../functions/api/list-members.js';
 import * as bindCode from '../functions/api/line-bind-code.js';
 import * as lineGroups from '../functions/api/line-groups.js';
 import { handleEvent } from '../functions/api/line/webhook.js';
@@ -22,7 +21,7 @@ async function setup() {
     return { status: response.status, body: await response.json() };
   };
   const group = (await call(lists.onRequestPost, owner, { body: { name: '朋友團' } })).body;
-  await call(members.onRequestPost, owner, { body: { list_id: group.id, email: 'pal@example.test' } });
+  DB.sqlite.prepare('INSERT INTO list_members (list_id, user_id) VALUES (?, ?)').run(group.id, pal.id);
   const say = (groupId, text) => handleEvent({ DB }, { type: 'message', message: { id: `m-${Math.random()}`, type: 'text', text }, source: { type: 'group', groupId } });
   const boundTo = (groupId) => DB.sqlite.prepare('SELECT list_id FROM line_groups WHERE group_id = ?').get(groupId)?.list_id ?? null;
   return { DB, owner, pal, outsider, call, group, say, boundTo };

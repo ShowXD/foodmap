@@ -19,7 +19,11 @@ export async function onRequestGet({ request, env, data }) {
   return json({ list, members: results, canManage: Boolean(list.is_owner || data.user.is_admin) });
 }
 
+// Adding someone by email is for site admins only. Anyone can start a group, so letting every owner do it
+// would let strangers pull people in without asking and probe which emails are registered;
+// owners invite with a link instead (invites.js), which the other person has to open.
 export async function onRequestPost({ request, env, data }) {
+  if (!data.user.is_admin) return json({ error: '請用「邀請連結」邀請成員' }, 403);
   const body = await request.json().catch(() => null);
   const list = await findManageableGroup(env.DB, data.user, body?.list_id);
   if (!list) return notFound();

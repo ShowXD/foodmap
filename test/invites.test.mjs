@@ -3,7 +3,6 @@ import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
 import * as lists from '../functions/api/lists.js';
-import * as members from '../functions/api/list-members.js';
 import * as invites from '../functions/api/invites.js';
 import * as join from '../functions/api/join.js';
 
@@ -19,7 +18,7 @@ async function setup() {
     return { status: response.status, body: await response.json() };
   };
   const group = (await call(lists.onRequestPost, owner, { body: { name: '家人' } })).body;
-  await call(members.onRequestPost, owner, { body: { list_id: group.id, email: 'member@example.test' } });
+  DB.sqlite.prepare('INSERT INTO list_members (list_id, user_id) VALUES (?, ?)').run(group.id, member.id);
   const isMember = (user) => Boolean(DB.sqlite.prepare('SELECT 1 FROM list_members WHERE list_id = ? AND user_id = ?').get(group.id, user.id));
   return { DB, owner, member, newcomer, another, call, group, isMember };
 }

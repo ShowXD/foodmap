@@ -53,9 +53,8 @@ async function load() {
   me ??= await fetch('/api/me').then((response) => response.json());
   const { list, members, canManage } = await api('GET', null, `?list=${listId}`);
   document.getElementById('group-title').textContent = `👥 ${list.name}`;
-  addForm.hidden = !canManage;
-  // Only site admins hand out ownership (the API ignores is_owner from anyone else).
-  document.getElementById('owner-option').hidden = !me.isAdmin;
+  // Adding by email (and handing out ownership) is for site admins; owners use the invite links below.
+  addForm.hidden = !(canManage && me.isAdmin);
   message.textContent = `${members.length} 位成員${canManage ? '' : '（只有擁有者能管理成員）'}`;
   memberList.replaceChildren(...members.map((member) => renderMember(member, canManage)));
   // Owners can't leave (a group must keep its owner); everyone else can.

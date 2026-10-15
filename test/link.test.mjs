@@ -92,7 +92,8 @@ test('unlinking: not the sign-in in use; afterwards that email is a separate new
 
 test('adding a group member by a linked email adds the person behind it', async () => {
   const DB = createTestDb();
-  const owner = await ensureUser(DB, 'owner@example.test', {});
+  // Adding by email is a site-admin tool.
+  const owner = await ensureUser(DB, 'owner@example.test', { ADMIN_EMAILS: 'owner@example.test' });
   const friend = await ensureUser(DB, 'friend@example.test', {});
   await as(DB, 'friend.alt@gmail.test', { cookie: await startLinkAs(DB, 'friend@example.test') });
 

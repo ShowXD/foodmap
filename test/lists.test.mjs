@@ -21,6 +21,8 @@ async function setup() {
 }
 
 const myLists = async (call, as) => (await call(lists.onRequestGet, as)).body;
+// What opening an invite link does (see invites.test.mjs); used here to set up members.
+const join = (DB, listId, person) => DB.sqlite.prepare('INSERT INTO list_members (list_id, user_id) VALUES (?, ?)').run(listId, person.id);
 
 test('new users are approved and get a private personal list', async () => {
   const { user, call } = await setup();
@@ -63,11 +65,11 @@ test('anyone can start a group and owns it; only site admins create one for some
 });
 
 test('any member may leave a group, but an owner cannot just walk away', async () => {
-  const { user, call } = await setup();
+  const { DB, user, call } = await setup();
   const friend = await user('friend@example.test');
   const pal = await user('pal@example.test');
   const group = (await call(lists.onRequestPost, friend, { method: 'POST', body: { name: '朋友團' } })).body;
-  await call(members.onRequestPost, friend, { method: 'POST', body: { list_id: group.id, email: 'pal@example.test' } });
+  join(DB, group.id, pal);
 
   assert.equal((await call(members.onRequestDelete, friend, { method: 'DELETE', body: { list_id: group.id, user_id: friend.id } })).status, 403);
   assert.equal((await call(members.onRequestDelete, pal, { method: 'DELETE', body: { list_id: group.id, user_id: pal.id } })).status, 200);
@@ -86,11 +88,14 @@ test('site admins can create groups for someone else; members see the group, out
   assert.equal((await call(lists.onRequestPost, admin, { method: 'POST', body: { name: '家人', owner_email: 'nobody@example.test' } })).status, 404);
   const family = (await call(lists.onRequestPost, admin, { method: 'POST', body: { name: '家人', owner_email: 'MOM@example.test' } })).body;
 
-  // The owner adds a member by email; strangers can't add themselves.
-  assert.equal((await call(members.onRequestPost, stranger, { method: 'POST', body: { list_id: family.id, email: 'stranger@example.test' } })).status, 404);
-  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } })).status, 201);
-  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } })).status, 409);
-  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'ghost@example.test' } })).status, 404);
+  // Owners invite with a link; adding by email is for site admins only, so nobody else can pull people
+  // in or probe which emails are registered.
+  assert.equal((await call(members.onRequestPost, stranger, { method: 'POST', body: { list_id: family.id, email: 'stranger@example.test' } })).status, 403);
+  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } })).status, 403);
+  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'ghost@example.test' } })).status, 403);
+  assert.equal((await call(members.onRequestPost, admin, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } })).status, 201);
+  assert.equal((await call(members.onRequestPost, admin, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } })).status, 409);
+  assert.equal((await call(members.onRequestPost, admin, { method: 'POST', body: { list_id: family.id, email: 'ghost@example.test' } })).status, 404);
 
   const saved = await call(places.onRequestPost, kid, { method: 'POST', body: { list_id: family.id, url: 'https://www.instagram.com/reel/b/', name: '阿宗麵線' } });
   assert.equal(saved.status, 201);
@@ -105,15 +110,15 @@ test('site admins can create groups for someone else; members see the group, out
 });
 
 test('members cannot manage the group; owners cannot be removed except by a site admin', async () => {
-  const { user, call } = await setup();
+  const { DB, user, call } = await setup();
   const admin = await user('admin@example.test');
   const mom = await user('mom@example.test');
   const kid = await user('kid@example.test');
   await user('aunt@example.test');
   const family = (await call(lists.onRequestPost, admin, { method: 'POST', body: { name: '家人', owner_email: 'mom@example.test' } })).body;
-  await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } });
+  join(DB, family.id, kid);
 
-  assert.equal((await call(members.onRequestPost, kid, { method: 'POST', body: { list_id: family.id, email: 'aunt@example.test' } })).status, 404);
+  assert.equal((await call(members.onRequestPost, kid, { method: 'POST', body: { list_id: family.id, email: 'aunt@example.test' } })).status, 403);
   assert.equal((await call(members.onRequestDelete, kid, { method: 'DELETE', body: { list_id: family.id, user_id: mom.id } })).status, 404);
   assert.equal((await call(members.onRequestDelete, mom, { method: 'DELETE', body: { list_id: family.id, user_id: mom.id } })).status, 403);
 
@@ -150,8 +155,9 @@ test('only site admins can make someone a group owner', async () => {
   await user('aunt@example.test');
   const family = (await call(lists.onRequestPost, admin, { method: 'POST', body: { name: '家人', owner_email: 'mom@example.test' } })).body;
 
-  // An owner asking for is_owner is silently downgraded to a normal member.
-  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test', is_owner: true } })).body.is_owner, 0);
+  // An owner can't add by email at all (let alone as owner); a site admin can choose either.
+  assert.equal((await call(members.onRequestPost, mom, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test', is_owner: true } })).status, 403);
+  assert.equal((await call(members.onRequestPost, admin, { method: 'POST', body: { list_id: family.id, email: 'kid@example.test' } })).body.is_owner, 0);
   assert.equal((await call(members.onRequestPost, admin, { method: 'POST', body: { list_id: family.id, email: 'aunt@example.test', is_owner: true } })).body.is_owner, 1);
 });
 
