@@ -1,5 +1,6 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
 import { fetchSocialPage, isSocialUrl, readLimited, readOgMeta } from '../../lib/social.js';
+import { takeUserQuota } from '../../lib/usage.js';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 1024 * 1024;
@@ -37,6 +38,8 @@ export async function onRequestGet({ params, env, data }) {
     .bind(place.id)
     .first();
   if (!stored?.image && !stored?.is_recent) {
+    // Over today's cap: show the placeholder without recording a failure, so it is fetched another day.
+    if (!(await takeUserQuota(env.DB, data.user.id, 'thumbnails'))) return notFound();
     const { url } = await env.DB.prepare('SELECT url FROM places WHERE id = ?').bind(place.id).first();
     const thumbnail = await fetchThumbnail(url);
     await env.DB

@@ -43,6 +43,17 @@ test('og:image is downloaded once, stored, and served to list members only', asy
   assert.equal((await get(10, stranger)).status, 404);
 });
 
+test('past the daily thumbnail cap nothing is fetched or recorded, so it is fetched another day', async () => {
+  const { DB, get } = await setup();
+  const mom = DB.sqlite.prepare("SELECT id FROM users WHERE email = 'mom@example.test'").get();
+  DB.sqlite.prepare("INSERT INTO user_daily_usage (user_id, api, day, count) VALUES (?, 'thumbnails', ?, 300)")
+    .run(mom.id, new Date().toISOString().slice(0, 10));
+  sent.length = 0;
+  assert.equal((await get(10)).status, 404);
+  assert.equal(sent.length, 0);
+  assert.equal(DB.sqlite.prepare('SELECT COUNT(*) AS n FROM place_thumbnails').get().n, 0);
+});
+
 test('non-social links, non-images and oversized images give no thumbnail, and failures are not retried right away', async () => {
   const { DB, get } = await setup();
   sent.length = 0;

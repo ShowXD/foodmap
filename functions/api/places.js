@@ -2,6 +2,7 @@ import { findAccessibleList, findAccessiblePlace } from '../../lib/lists.js';
 import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
 import { retryPendingAi } from '../../lib/place-ai.js';
 import { isHttpUrl, MAX_CAPTION_LENGTH } from '../../lib/social.js';
+import { STORAGE_LIMITS, takeUserQuota } from '../../lib/usage.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
 const SOURCES = new Set(['line', 'share', 'manual']);
@@ -78,6 +79,9 @@ export async function onRequestPost({ request, env, data }) {
   if (error) return json({ error }, 400);
   const source = SOURCES.has(body.source) ? body.source : 'manual';
 
+  if (!(await takeUserQuota(env.DB, data.user.id, 'place_saves'))) {
+    return json({ error: `今天已經新增 ${STORAGE_LIMITS.place_saves.perUserDaily} 家了，明天再繼續` }, 429);
+  }
   // One video can feature several shops, so a duplicate is the same url *and* the same shop name in the same list.
   // Checked inside the INSERT so a double-tapped save can't slip two rows in between a check and the insert.
   const columns = ['list_id', 'created_by', 'url', 'source', ...Object.keys(fields)];

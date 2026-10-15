@@ -170,3 +170,16 @@ test('the same shop can be saved once per list', async () => {
   assert.equal((await call(places.onRequestPost, mom, { method: 'POST', body })).status, 409);
   assert.equal((await call(places.onRequestPost, mom, { method: 'POST', body: { ...body, name: '阿宗麵線' } })).status, 201);
 });
+
+test('one person can add at most 300 shops a day', async () => {
+  const { DB, user, call } = await setup();
+  const mom = await user('mom@example.test');
+  const [momList] = await myLists(call, mom);
+  DB.sqlite.prepare("INSERT INTO user_daily_usage (user_id, api, day, count) VALUES (?, 'place_saves', ?, 299)")
+    .run(mom.id, new Date().toISOString().slice(0, 10));
+  const add = (name) => call(places.onRequestPost, mom, { method: 'POST', body: { list_id: momList.id, url: 'https://www.instagram.com/reel/d/', name } });
+  assert.equal((await add('第 300 家')).status, 201);
+  const refused = await add('第 301 家');
+  assert.equal(refused.status, 429);
+  assert.match(refused.body.error, /300/);
+});
