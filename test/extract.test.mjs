@@ -73,6 +73,9 @@ test('groundPlaces drops names, places and dishes the post never says, but keeps
   assert.deepEqual(groundPlaces([garbled, good], post), [
     { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵、餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食 平價' },
   ]);
+  // Place names (the 地區 field has them) and anything past three tags are dropped.
+  const [tagged] = groundPlaces([{ ...good, tags: '["臺中", "西區"] 宵夜 平價 #排隊 甜點' }], post);
+  assert.equal(tagged.tags, '宵夜 平價 排隊');
 });
 
 test('garbledFields flags name/address/area with characters the post never uses, unless edited by hand', () => {

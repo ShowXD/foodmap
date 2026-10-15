@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { beforeEach } from 'node:test';
-import { emptyFilter, matchesFilter, sortPlaces, state, tagsOf } from '../public/state.js';
+import { emptyFilter, matchesFilter, sortPlaces, state, tagCounts, tagsOf } from '../public/state.js';
 
 // Taichung 西區; 江家 is ~0.2 km away, 阿宗 in Taipei ~130 km, the nameless one has no position.
 const HERE = { lat: 24.15, lng: 120.665 };
@@ -22,6 +22,10 @@ test('tagsOf drops #, ＃, quotes and brackets, and repeats', () => {
   assert.deepEqual(tagsOf({ tags: '#宵夜 ##平價 ＃台中 宵夜' }), ['宵夜', '平價', '台中']);
   assert.deepEqual(tagsOf({ tags: '["台中", "西區美食"] 「台中」' }), ['台中', '西區美食']);
   assert.deepEqual(tagsOf({ tags: null }), []);
+});
+
+test('tagCounts: most used first, ties in Chinese order', () => {
+  assert.deepEqual(tagCounts(PLACES), [['宵夜', 2], ['下午茶', 1], ['小吃', 1], ['牛肉麵', 1], ['平價', 1], ['飲料', 1]]);
 });
 
 test('each filter narrows on its own', () => {

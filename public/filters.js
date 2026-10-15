@@ -1,7 +1,7 @@
 // The 篩選與排序 sheet, and the row above the list and the map showing what is chosen (they share one filter).
 import { fitToRadius } from './map.js';
 import { $, openDialog } from './shared.js';
-import { byChineseOrder, distanceTo, emptyFilter, PLACE_ISSUES, SORTS, state, STATUSES, tagsOf } from './state.js';
+import { distanceTo, emptyFilter, PLACE_ISSUES, SORTS, state, STATUSES, tagsByUse } from './state.js';
 
 const NEAR_RADII_KM = [1, 3, 5];
 const QUICK_RADIUS_KM = 3;
@@ -43,13 +43,6 @@ function chosenConditions() {
     filter.tag && [filter.tag, () => { filter.tag = null; }],
     state.sort !== 'newest' && [`排序：${SORTS[state.sort].label}`, () => { state.sort = 'newest'; }],
   ].filter(Boolean);
-}
-
-/** Tags by how many of these places use them, most used first. */
-function tagsByUse(places) {
-  const counts = new Map();
-  for (const tag of places.flatMap(tagsOf)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-  return [...counts].sort(([a, countA], [b, countB]) => countB - countA || byChineseOrder(a, b)).map(([tag]) => tag);
 }
 
 // One tap, no sheet: 想吃, 未吃, a range when we know where the person is, and the tags most used by the

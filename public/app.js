@@ -1,6 +1,7 @@
 import { prefillFromShare, resetForm, startEdit } from './add-form.js';
 import { showAdmin } from './admin.js';
 import { connectFilters, renderFilterBar } from './filters.js';
+import { connectTags } from './tags.js';
 import './me.js';
 import { showMembers } from './members.js';
 import {
@@ -411,6 +412,7 @@ connectMap({
   reloadPlaces: loadPlaces,
 });
 connectFilters(renderPlaces);
+connectTags(loadPlaces);
 
 // ---- 今天吃什麼 ----
 const randomTag = $('random-tag');

@@ -47,7 +47,7 @@ export const PLACE_ISSUES = {
   duplicate: { label: '重複', test: (place) => Boolean(place.duplicates?.length) },
 };
 // Same separators as lib/ai.js normalizeTags, so tags saved before it (「#宵夜 ##平價」、「["台中"」) read as plain words too.
-export const tagsOf = (place) => [...new Set(String(place.tags ?? '').split(/[\s,，、#＃|｜"'“”‘’「」『』\[\]【】()（）]+/).filter(Boolean))];
+export const tagsOf = (place) => [...new Set(String(place.tags ?? '').split(/[\s,，、#＃|｜"'“”‘’「」『』[\]【】()（）]+/).filter(Boolean))];
 
 function distanceKm(from, to) {
   const radians = (degrees) => (degrees * Math.PI) / 180;
@@ -88,3 +88,11 @@ export const SORTS = {
   distance: { label: '距離', compare: (a, b) => (distanceTo(a) ?? Infinity) - (distanceTo(b) ?? Infinity) },
 };
 export const sortPlaces = (places) => [...places].sort(SORTS[state.sort].compare);
+
+/** Tags with how many of these places use them, most used first. */
+export function tagCounts(places) {
+  const counts = new Map();
+  for (const tag of places.flatMap(tagsOf)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  return [...counts].sort(([a, countA], [b, countB]) => countB - countA || byChineseOrder(a, b));
+}
+export const tagsByUse = (places) => tagCounts(places).map(([tag]) => tag);

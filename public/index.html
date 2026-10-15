@@ -44,6 +44,7 @@
       <div id="list-menu" class="popover-menu" popover>
         <button id="new-group" type="button">＋ 建立群組</button>
         <a id="members-link" href="#members" hidden>👥 群組成員與邀請</a>
+        <button id="manage-tags" type="button">🏷️ 管理標籤</button>
         <a id="export-link" href="/api/export" download>⬇️ 匯出這份清單（CSV）</a>
       </div>
       <div class="list-tools">
@@ -270,6 +271,18 @@
       <div class="actions">
         <button value="done">完成</button>
         <button id="filter-clear" type="button" class="secondary">全部清除</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="tags-dialog" class="sheet" aria-labelledby="tags-title">
+    <form method="dialog">
+      <h2 id="tags-title">管理標籤</h2>
+      <p class="meta">改動會套用到這份清單的每一家店；改成已有的標籤會合併成一個。</p>
+      <ul id="tag-rows" class="tag-rows"></ul>
+      <output id="tags-message" class="meta"></output>
+      <div class="actions">
+        <button value="done">完成</button>
       </div>
     </form>
   </dialog>
