@@ -66,12 +66,12 @@ test('parsePlaces handles several shops, JSON strings, and a bare single object'
   assert.equal(parsePlaces(undefined), null);
 });
 
-test('groundPlaces drops values the AI garbled or made up, keeping what the post says', () => {
+test('groundPlaces drops names, places and dishes the post never says, but keeps the AI\'s own tags', () => {
   const post = '#江家餛飩 📍臺中市西區華美街204號 📌紅油鮮蝦炒手麵 餛飩湯 #台中美食';
   const garbled = { name: '江家予龍', dishes: '紅油蝦蘋十鸡龍', area: '號中市西園区', address: '號中市西園路區三萬號運204畫号', tags: '庫美美飯 #台中美食' };
   const good = { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵, 餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食 平價' };
   assert.deepEqual(groundPlaces([garbled, good], post), [
-    { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵、餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食' },
+    { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵、餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食 平價' },
   ]);
 });
 
