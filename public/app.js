@@ -1,6 +1,9 @@
 import { showAdmin } from './admin.js';
 import { showMembers } from './members.js';
 import { $, api, openDialog, readSetting, saveSetting } from './shared.js';
+import {
+  distanceTo, formatDistance, isLocated, latLngOf, mapsUrl, matchesFilter, needsTidying, PIN_STYLE_KEY, state, tagsOf,
+} from './state.js';
 
 const searchInput = $('search');
 const placeList = $('place-list');
@@ -20,33 +23,8 @@ const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'no
 
 const TAIWAN = { lat: 23.7, lng: 120.96 };
 
-let lists = [];
-let currentListId = null;
-let places = [];
-let filter = { mode: 'all', tag: null, radius: undefined };
 const NEAR_RADII_KM = [1, 3, 5];
 let layout = readSetting(LAYOUT_STORAGE_KEY) === 'grid' ? 'grid' : 'rows';
-let myPosition = null;
-let locationError = null;
-
-const mapsUrl = (place) => {
-  const query = encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '));
-  return `https://www.google.com/maps/search/?api=1&query=${query}${place.google_place_id ? `&query_place_id=${encodeURIComponent(place.google_place_id)}` : ''}`;
-};
-const isLocated = (place) => place.lat != null && place.lng != null;
-// LINE places may have only a link (no name) or no map position yet.
-const needsTidying = (place) => !place.name || !isLocated(place);
-const tagsOf = (place) => String(place.tags ?? '').split(/\s+/).filter(Boolean);
-
-function distanceKm(from, to) {
-  const radians = (degrees) => (degrees * Math.PI) / 180;
-  const a = Math.sin(radians(to.lat - from.lat) / 2) ** 2 +
-    Math.cos(radians(from.lat)) * Math.cos(radians(to.lat)) * Math.sin(radians(to.lng - from.lng) / 2) ** 2;
-  return 12742 * Math.asin(Math.sqrt(a));
-}
-const distanceTo = (place) => (myPosition && isLocated(place) ? distanceKm(myPosition, place) : null);
-const formatDistance = (km) => (km < 1 ? `${Math.round(km * 1000)} 公尺` : `${km.toFixed(1)} 公里`);
-
 // ---- Views (hash routing keeps the phone's back button working) ----
 let currentView = null;
 let hasShownView = false; // the first render (e.g. opening straight into #add from a share) shouldn't animate
@@ -60,7 +38,7 @@ function showView() {
   const [route, query = ''] = location.hash.slice(1).split('?');
   const view = VIEWS.includes(route) ? route : 'map';
   if (ADMIN_VIEWS.includes(view)) showAdmin(view);
-  if (view === 'members') showMembers(Number(new URLSearchParams(query).get('list')) || currentListId);
+  if (view === 'members') showMembers(Number(new URLSearchParams(query).get('list')) || state.currentListId);
   // Not body.dataset.view: an animated switch updates that later, after a following hashchange may already run.
   const previous = currentView;
   currentView = view;
@@ -209,7 +187,7 @@ async function reanalyzePlace(place, button) {
 const canReanalyze = (place) => !place.name && Boolean(place.caption);
 const reanalyzeAllButton = $('reanalyze-all');
 reanalyzeAllButton.addEventListener('click', async () => {
-  const waiting = places.filter(canReanalyze);
+  const waiting = state.places.filter(canReanalyze);
   reanalyzeAllButton.disabled = true;
   let done = 0;
   try {
@@ -309,40 +287,22 @@ function chip(label, isActive, onClick) {
   return button;
 }
 
-const SEARCH_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'note', 'caption'];
-// The search box narrows the list and the map only; 今天吃什麼 and the tag menus always use the whole list.
-function matchesSearch(place) {
-  const query = searchInput.value.trim().toLowerCase();
-  return !query || SEARCH_FIELDS.some((field) => String(place[field] ?? '').toLowerCase().includes(query));
-}
-
-function matchesFilter(place) {
-  if (!matchesSearch(place)) return false;
-  if (filter.mode === 'todo' && place.my_visited_at) return false;
-  if (filter.mode === 'visited' && !place.my_visited_at) return false;
-  if (filter.mode === 'starred' && !place.starred) return false;
-  if (filter.mode === 'untidy' && !needsTidying(place)) return false;
-  if (filter.mode === 'near' && !(distanceTo(place) != null && distanceTo(place) <= filter.radius)) return false;
-  if (filter.tag && !tagsOf(place).includes(filter.tag)) return false;
-  return true;
-}
-
 function renderChips() {
-  const untidy = places.filter(needsTidying).length;
+  const untidy = state.places.filter(needsTidying).length;
   const modes = [['all', '全部'], ['todo', '未吃'], ['visited', '吃過'], ['starred', '★ 想吃']];
-  if (myPosition) modes.splice(1, 0, ...NEAR_RADII_KM.map((km) => ['near', `📍 ${km} 公里`, km]));
+  if (state.myPosition) modes.splice(1, 0, ...NEAR_RADII_KM.map((km) => ['near', `📍 ${km} 公里`, km]));
   if (untidy) modes.push(['untidy', `待整理 ${untidy}`]);
-  const tags = [...new Set(places.flatMap(tagsOf))].sort();
+  const tags = [...new Set(state.places.flatMap(tagsOf))].sort();
   // The list and the map share one filter, so both rows show the same chips.
   for (const container of [filterChips, $('map-chips')]) {
     container.replaceChildren(
-      ...modes.map(([mode, label, radius]) => chip(label, filter.mode === mode && filter.radius === radius, () => {
-        filter.mode = mode;
-        filter.radius = radius;
+      ...modes.map(([mode, label, radius]) => chip(label, state.filter.mode === mode && state.filter.radius === radius, () => {
+        state.filter.mode = mode;
+        state.filter.radius = radius;
         renderPlaces();
         if (radiusCircle?.getMap()) map.fitBounds(radiusCircle.getBounds(), 24);
       })),
-      ...tags.map((tag) => chip(`#${tag}`, filter.tag === tag, () => { filter.tag = filter.tag === tag ? null : tag; renderPlaces(); })),
+      ...tags.map((tag) => chip(`#${tag}`, state.filter.tag === tag, () => { state.filter.tag = state.filter.tag === tag ? null : tag; renderPlaces(); })),
     );
   }
 }
@@ -350,8 +310,8 @@ function renderChips() {
 function renderPlaces() {
   renderRandomTags();
   renderChips();
-  const shown = places.filter(matchesFilter);
-  if (filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
+  const shown = state.places.filter(matchesFilter);
+  if (state.filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
   renderMarkers();
   refreshMapCard();
   refreshRandomPick();
@@ -360,28 +320,28 @@ function renderPlaces() {
     button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
   }
   placeList.replaceChildren(...shown.map((place) => renderListItem(place, layout)));
-  const waitingForAi = places.filter(canReanalyze).length;
+  const waitingForAi = state.places.filter(canReanalyze).length;
   reanalyzeAllButton.hidden = !waitingForAi;
   if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 待整理的 ${waitingForAi} 家全部 AI 重新分析`;
   if (shown.length) listMessage.textContent = '';
-  else if (!places.length) listMessage.textContent = '還沒有收藏，按下方＋新增一家吧';
+  else if (!state.places.length) listMessage.textContent = '還沒有收藏，按下方＋新增一家吧';
   else listMessage.textContent = searchInput.value.trim() ? '找不到符合的店' : '沒有符合篩選的店';
 }
 
 let placesLoad = 0;
 async function loadPlaces({ markRead = false } = {}) {
-  if (!currentListId) return;
+  if (!state.currentListId) return;
   // Switching lists while a load is in flight: only the newest answer may be drawn,
   // or an older list's shops would show (and be edited) under the newly chosen list.
   const thisLoad = ++placesLoad;
   listMessage.textContent = '載入中…';
   try {
-    const loaded = await api('GET', null, `?list=${currentListId}`);
+    const loaded = await api('GET', null, `?list=${state.currentListId}`);
     if (thisLoad !== placesLoad) return;
-    places = loaded;
+    state.places = loaded;
     renderPlaces();
     // Remember this visit so places added afterwards show as "新" next time.
-    if (markRead) api('POST', { list_id: currentListId }, '', '/api/list-read').catch((error) => console.error('list-read failed', error));
+    if (markRead) api('POST', { list_id: state.currentListId }, '', '/api/list-read').catch((error) => console.error('list-read failed', error));
   } catch (error) {
     if (thisLoad === placesLoad) listMessage.textContent = `載入失敗：${error.message}`;
   }
@@ -395,7 +355,10 @@ for (const button of document.querySelectorAll('.layout-toggle button')) {
   });
 }
 
-searchInput.addEventListener('input', renderPlaces);
+searchInput.addEventListener('input', () => {
+  state.search = searchInput.value.trim().toLowerCase();
+  renderPlaces();
+});
 
 // ---- Map ----
 const mapCard = $('map-card');
@@ -454,34 +417,24 @@ async function initMap() {
   renderMarkers();
 }
 
-const latLngOf = (place) => ({ lat: place.lat, lng: place.lng });
 const PIN_COLORS = { starred: ['#f59f00', '#b37400'], visited: ['#adb5bd', '#868e96'], todo: ['#d9480f', '#a8380b'] };
 
-// Pin look chosen on 我的 (kept per device); colours always mean 未吃／吃過／想吃.
-const PIN_STYLE_KEY = 'foodmap.pinStyle';
 const PIN_SCALES = { s: 0.8, m: 1, l: 1.3 };
-let pinStyle = { shape: 'pin', size: 'm', showName: false };
-try {
-  pinStyle = { ...pinStyle, ...JSON.parse(localStorage.getItem(PIN_STYLE_KEY) ?? '{}') };
-} catch {
-  // Unreadable or blocked storage: keep the defaults.
-}
-
 function pinFor(place) {
   const [background, borderColor] = PIN_COLORS[place.starred ? 'starred' : place.my_visited_at ? 'visited' : 'todo'];
-  const scale = PIN_SCALES[pinStyle.size] ?? 1;
+  const scale = PIN_SCALES[state.pinStyle.size] ?? 1;
   let pin;
-  if (pinStyle.shape === 'pin') {
+  if (state.pinStyle.shape === 'pin') {
     pin = new markerLibrary.PinElement({ background, borderColor, glyphColor: '#fff', scale });
   } else {
     pin = document.createElement('div');
-    pin.className = `map-marker ${pinStyle.shape === 'food' ? 'food' : 'dot'}`;
+    pin.className = `map-marker ${state.pinStyle.shape === 'food' ? 'food' : 'dot'}`;
     pin.style.setProperty('--marker-color', background);
     pin.style.setProperty('--marker-border', borderColor);
     pin.style.setProperty('--marker-scale', String(scale));
-    if (pinStyle.shape === 'food') pin.textContent = '🍜';
+    if (state.pinStyle.shape === 'food') pin.textContent = '🍜';
   }
-  if (!pinStyle.showName || !place.name) return pin;
+  if (!state.pinStyle.showName || !place.name) return pin;
   // The marker is anchored at its bottom centre, so the name goes above the pin to keep the tip on the spot.
   const labelled = document.createElement('div');
   labelled.className = 'marker-with-name';
@@ -495,11 +448,11 @@ function pinFor(place) {
 function renderMarkers() {
   if (!map) return;
   for (const marker of markers) marker.map = null;
-  const shown = places.filter((place) => isLocated(place) && matchesFilter(place) && place.id !== draggingPlace?.id);
+  const shown = state.places.filter((place) => isLocated(place) && matchesFilter(place) && place.id !== draggingPlace?.id);
   // The map opens on the person's own position (showMyPosition); framing all the shops is the fallback
   // only when that position won't come (denied or unsupported). After that the map stays where they moved it.
   // Done before drawing markers so the view is right even if drawing one fails.
-  if (!hasFittedMap && shown.length && (locationError || !navigator.geolocation)) {
+  if (!hasFittedMap && shown.length && (state.locationError || !navigator.geolocation)) {
     hasFittedMap = true;
     fitToPlaces(shown);
   }
@@ -514,14 +467,14 @@ function renderMarkers() {
 // The 幾公里內 filter draws its range around the person's position.
 let radiusCircle = null;
 function renderRadius() {
-  if (!map || !myPosition || filter.mode !== 'near') {
+  if (!map || !state.myPosition || state.filter.mode !== 'near') {
     radiusCircle?.setMap(null);
     return;
   }
   radiusCircle ??= new google.maps.Circle({
     clickable: false, strokeColor: '#d9480f', strokeOpacity: 0.7, strokeWeight: 2, fillColor: '#d9480f', fillOpacity: 0.08,
   });
-  radiusCircle.setOptions({ map, center: myPosition, radius: filter.radius * 1000 });
+  radiusCircle.setOptions({ map, center: state.myPosition, radius: state.filter.radius * 1000 });
 }
 
 function fitToPlaces(shown) {
@@ -536,7 +489,7 @@ function fitToPlaces(shown) {
 }
 
 $('fit-all').addEventListener('click', () => {
-  const shown = places.filter((place) => isLocated(place) && matchesFilter(place));
+  const shown = state.places.filter((place) => isLocated(place) && matchesFilter(place));
   if (map && shown.length) fitToPlaces(shown);
 });
 
@@ -544,14 +497,14 @@ function watchMyPosition() {
   if (!navigator.geolocation) return;
   navigator.geolocation.watchPosition(
     (position) => {
-      const isFirstFix = !myPosition;
-      myPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
-      myAccuracy = position.coords.accuracy;
+      const isFirstFix = !state.myPosition;
+      state.myPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
+      state.myAccuracy = position.coords.accuracy;
       showMyPosition(isFirstFix);
       if (isFirstFix) renderPlaces(); // distances and the 附近 chip appear
     },
     (error) => {
-      locationError = error;
+      state.locationError = error;
       console.warn('Location unavailable', error.message);
       if (map && !hasFittedMap) renderMarkers(); // no position coming: show all the shops instead
     },
@@ -560,28 +513,27 @@ function watchMyPosition() {
   );
 }
 
-let myAccuracy = null; // metres, as reported by the browser
 let accuracyCircle = null;
 // The fix the map was auto-centred on; later, sharper fixes re-centre only while the map hasn't been moved since.
 let centeredOn = null;
 
 // Runs on every location fix and once the map is ready, whichever comes last draws the dot.
 function showMyPosition(shouldCenter) {
-  if (!map || !myPosition) return;
+  if (!map || !state.myPosition) return;
   accuracyCircle ??= new google.maps.Circle({ map, clickable: false, strokeWeight: 0, fillColor: '#1a73e8', fillOpacity: 0.12 });
-  accuracyCircle.setOptions({ center: myPosition, radius: myAccuracy ?? 0 });
+  accuracyCircle.setOptions({ center: state.myPosition, radius: state.myAccuracy ?? 0 });
   if (myMarker) {
-    myMarker.position = myPosition;
+    myMarker.position = state.myPosition;
     renderRadius();
     const center = map.getCenter();
     const isUntouched = centeredOn && center
       && Math.abs(center.lat() - centeredOn.lat) < 1e-6 && Math.abs(center.lng() - centeredOn.lng) < 1e-6;
-    if (isUntouched && myAccuracy < centeredOn.accuracy / 2) centerOnMe();
+    if (isUntouched && state.myAccuracy < centeredOn.accuracy / 2) centerOnMe();
     return;
   }
   const dot = document.createElement('div');
   dot.className = 'my-dot';
-  myMarker = new markerLibrary.AdvancedMarkerElement({ map, position: myPosition, content: dot, title: '我的位置', zIndex: 1000 });
+  myMarker = new markerLibrary.AdvancedMarkerElement({ map, position: state.myPosition, content: dot, title: '我的位置', zIndex: 1000 });
   if (shouldCenter) {
     centerOnMe();
     map.setZoom(15);
@@ -590,24 +542,24 @@ function showMyPosition(shouldCenter) {
 }
 
 function centerOnMe() {
-  map.setCenter(myPosition);
+  map.setCenter(state.myPosition);
   const center = map.getCenter();
-  centeredOn = { lat: center.lat(), lng: center.lng(), accuracy: myAccuracy ?? Infinity };
+  centeredOn = { lat: center.lat(), lng: center.lng(), accuracy: state.myAccuracy ?? Infinity };
 }
 
 $('locate-me').addEventListener('click', () => {
-  if (!myPosition) {
-    alert(locationError?.code === 1
+  if (!state.myPosition) {
+    alert(state.locationError?.code === 1
       ? '沒有定位權限。請到瀏覽器或手機設定，允許這個網站使用位置'
       : '還在取得你的位置，請稍候再按一次');
     return;
   }
   if (!map) return;
-  map.panTo(myPosition);
+  map.panTo(state.myPosition);
   map.setZoom(Math.max(map.getZoom(), 15));
   // Android lets people grant only "approximate" location, which is off by a kilometre or more.
-  if (myAccuracy > 500) {
-    alert(`目前只取得大概位置（誤差約 ${formatDistance(myAccuracy / 1000)}）。請到手機的「設定 → 位置 → 應用程式位置權限 → Chrome」開啟「使用精確位置」，並確認 GPS 已開啟`);
+  if (state.myAccuracy > 500) {
+    alert(`目前只取得大概位置（誤差約 ${formatDistance(state.myAccuracy / 1000)}）。請到手機的「設定 → 位置 → 應用程式位置權限 → Chrome」開啟「使用精確位置」，並確認 GPS 已開啟`);
   }
 });
 
@@ -625,7 +577,7 @@ $('map-card-close').addEventListener('click', hideMapCard);
 
 // Keeps the open card in sync after 吃過/★/編輯 reload the list.
 function refreshMapCard() {
-  const place = places.find((candidate) => candidate.id === mapCardPlaceId);
+  const place = state.places.find((candidate) => candidate.id === mapCardPlaceId);
   if (place) showMapCard(place);
   else hideMapCard();
 }
@@ -653,7 +605,7 @@ async function startDrag(place) {
   }
   hideMapCard();
   draggingPlace = place;
-  const position = isLocated(place) ? latLngOf(place) : myPosition ?? map.getCenter().toJSON();
+  const position = isLocated(place) ? latLngOf(place) : state.myPosition ?? map.getCenter().toJSON();
   dragMarker = new markerLibrary.AdvancedMarkerElement({ map, position, gmpDraggable: true, title: place.name || '', content: pinFor(place) });
   map.panTo(position);
   map.setZoom(Math.max(map.getZoom(), 17));
@@ -679,7 +631,7 @@ $('drag-save').addEventListener('click', async () => {
   try {
     await api('PUT', { place_id: place.id, lat, lng }, '', '/api/place-location');
     await loadPlaces();
-    const updated = places.find((candidate) => candidate.id === place.id);
+    const updated = state.places.find((candidate) => candidate.id === place.id);
     if (updated) showMapCard(updated);
   } catch (error) {
     alert(`儲存位置失敗：${error.message}`);
@@ -750,7 +702,7 @@ async function chooseLocation(place, candidate) {
     await api('PUT', { place_id: place.id, google_place_id, lat, lng }, '', '/api/place-location');
     locateDialog.close('cancel');
     await loadPlaces();
-    const updated = places.find((candidateRow) => candidateRow.id === place.id);
+    const updated = state.places.find((candidateRow) => candidateRow.id === place.id);
     if (updated) focusPlace(updated);
   } catch (error) {
     locateMessage.textContent = `儲存失敗：${error.message}`;
@@ -777,7 +729,7 @@ let randomPick = null;
 
 function renderRandomTags() {
   const chosen = randomTag.value;
-  const tags = [...new Set(places.flatMap(tagsOf))].sort();
+  const tags = [...new Set(state.places.flatMap(tagsOf))].sort();
   randomTag.replaceChildren(new Option('全部', ''), ...tags.map((tag) => new Option(`#${tag}`, tag)));
   randomTag.value = tags.includes(chosen) ? chosen : '';
 }
@@ -785,9 +737,9 @@ function renderRandomTags() {
 $('random-pick').addEventListener('click', () => {
   const radius = Number($('random-radius').value);
   const includeVisited = $('random-include-visited').checked;
-  let candidates = places.filter((place) => place.name && (includeVisited || !place.my_visited_at) && (!randomTag.value || tagsOf(place).includes(randomTag.value)));
+  let candidates = state.places.filter((place) => place.name && (includeVisited || !place.my_visited_at) && (!randomTag.value || tagsOf(place).includes(randomTag.value)));
   const notes = [];
-  if (radius && myPosition) candidates = candidates.filter((place) => (distanceTo(place) ?? Infinity) <= radius);
+  if (radius && state.myPosition) candidates = candidates.filter((place) => (distanceTo(place) ?? Infinity) <= radius);
   else if (radius) notes.push('還沒取得你的位置，先從所有店家裡抽');
 
   if (!candidates.length) {
@@ -807,7 +759,7 @@ $('random-pick').addEventListener('click', () => {
 // After ★ / 吃過 / a reload the pick is a new object; redraw it so its buttons act on current data.
 function refreshRandomPick() {
   if (!randomPick) return;
-  randomPick = places.find((place) => place.id === randomPick.id) ?? null;
+  randomPick = state.places.find((place) => place.id === randomPick.id) ?? null;
   $('random-result').replaceChildren(...(randomPick ? [renderPlace(randomPick)] : []));
   $('random-on-map').hidden = !randomPick || !isLocated(randomPick);
 }
@@ -895,7 +847,7 @@ saveCandidatesButton.addEventListener('click', async () => {
   const counts = { saved: 0, duplicate: 0, failed: 0 };
   for (const place of chosen) {
     try {
-      await api('POST', { ...place, list_id: currentListId, url: url.value, caption: caption.value, source: source.value, note: note.value });
+      await api('POST', { ...place, list_id: state.currentListId, url: url.value, caption: caption.value, source: source.value, note: note.value });
       counts.saved++;
     } catch (error) {
       if (error.status === 409) counts.duplicate++;
@@ -950,7 +902,7 @@ addForm.addEventListener('submit', async (event) => {
   const editingId = Number(formFields.id);
   try {
     if (editingId) await api('PATCH', { ...formFields, id: editingId });
-    else await api('POST', { ...formFields, list_id: currentListId });
+    else await api('POST', { ...formFields, list_id: state.currentListId });
     resetForm();
     formMessage.textContent = editingId ? '已更新' : '已儲存';
     await loadPlaces();
@@ -976,19 +928,19 @@ function prefillFromShare() {
 
 // ---- Lists and "我的" ----
 function selectList(listId) {
-  const list = lists.find((candidate) => candidate.id === listId) ?? lists[0];
-  currentListId = list.id;
+  const list = state.lists.find((candidate) => candidate.id === listId) ?? state.lists[0];
+  state.currentListId = list.id;
   listSelect.value = String(list.id);
   $('members-link').hidden = Boolean(list.is_personal);
   $('members-link').href = `#members?list=${list.id}`;
   $('export-link').href = `/api/export?list=${list.id}`;
-  filter = { mode: 'all', tag: null };
+  state.filter = { mode: 'all', tag: null };
   saveSetting(LIST_STORAGE_KEY, String(list.id));
 }
 
 async function loadLists() {
-  lists = await api('GET', null, '', '/api/lists');
-  listSelect.replaceChildren(...lists.map((list) => new Option(`${list.is_personal ? '👤' : '👥'} ${list.name}`, list.id)));
+  state.lists = await api('GET', null, '', '/api/lists');
+  listSelect.replaceChildren(...state.lists.map((list) => new Option(`${list.is_personal ? '👤' : '👥'} ${list.name}`, list.id)));
   selectList(Number(readSetting(LIST_STORAGE_KEY)));
 }
 
@@ -1035,7 +987,7 @@ groupForm.addEventListener('submit', async (event) => {
 window.addEventListener('foodmap:lists-changed', async () => {
   try {
     await loadLists();
-    switchToList(currentListId);
+    switchToList(state.currentListId);
   } catch (error) {
     listMessage.textContent = `清單更新失敗，請重新整理：${error.message}`;
   }
@@ -1155,13 +1107,13 @@ profileDialog.addEventListener('close', async () => {
 const pinShapeSelect = $('pin-shape');
 const pinSizeSelect = $('pin-size');
 const pinShowName = $('pin-show-name');
-pinShapeSelect.value = pinStyle.shape;
-pinSizeSelect.value = pinStyle.size;
-pinShowName.checked = Boolean(pinStyle.showName);
+pinShapeSelect.value = state.pinStyle.shape;
+pinSizeSelect.value = state.pinStyle.size;
+pinShowName.checked = Boolean(state.pinStyle.showName);
 
 function savePinStyle() {
-  pinStyle = { shape: pinShapeSelect.value, size: pinSizeSelect.value, showName: pinShowName.checked };
-  saveSetting(PIN_STYLE_KEY, JSON.stringify(pinStyle));
+  state.pinStyle = { shape: pinShapeSelect.value, size: pinSizeSelect.value, showName: pinShowName.checked };
+  saveSetting(PIN_STYLE_KEY, JSON.stringify(state.pinStyle));
   renderMarkers();
 }
 for (const control of [pinShapeSelect, pinSizeSelect, pinShowName]) control.addEventListener('change', savePinStyle);
