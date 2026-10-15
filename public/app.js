@@ -542,14 +542,16 @@ async function acceptInvite() {
 prefillFromShare();
 watchMyPosition();
 showView();
-acceptInvite()
-  .then(async (joined) => {
-    await loadLists();
-    if (!joined) return loadPlaces({ markRead: true });
+try {
+  const joined = await acceptInvite();
+  await loadLists();
+  if (joined) {
     switchToList(joined.list_id);
     location.hash = '#list';
     alert(joined.already_member ? `你已經在「${joined.list_name}」裡了` : `已加入「${joined.list_name}」！`);
-  })
-  .catch((error) => {
-    listMessage.textContent = `載入清單失敗：${error.message}`;
-  });
+  } else {
+    await loadPlaces({ markRead: true });
+  }
+} catch (error) {
+  listMessage.textContent = `載入清單失敗：${error.message}`;
+}
