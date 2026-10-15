@@ -1,5 +1,6 @@
 import { aiModel, extractPlaces } from '../../lib/ai.js';
 import { fetchCaption, isSocialUrl, MAX_CAPTION_LENGTH } from '../../lib/social.js';
+import { fetchYoutubeText } from '../../lib/youtube.js';
 import { APIS, recordUsage, takeUserQuota } from '../../lib/usage.js';
 
 // Keeps one account from burning the shared daily free AI quota.
@@ -16,7 +17,8 @@ export async function onRequestPost({ request, env, data }) {
   const url = typeof body.url === 'string' ? body.url.trim() : '';
   let caption = typeof body.caption === 'string' ? body.caption.trim() : '';
 
-  if (!caption && isSocialUrl(url)) caption = await fetchCaption(url);
+  // YouTube: full description and top comments when the API is on; otherwise the page's og tags.
+  if (!caption && isSocialUrl(url)) caption = ((await fetchYoutubeText(env, url)) || (await fetchCaption(url))).slice(0, MAX_CAPTION_LENGTH);
   if (!caption) return json({ error: '抓不到貼文文字，請把貼文內容貼到「貼文文字」再試一次', needCaption: true }, 422);
   if (caption.length > MAX_CAPTION_LENGTH) return json({ error: `貼文文字超過 ${MAX_CAPTION_LENGTH} 字` }, 413);
   if (!(await takeUserQuota(env.DB, data.user.id, 'workers_ai'))) {

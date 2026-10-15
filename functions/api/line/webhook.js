@@ -1,6 +1,7 @@
 import { aiModel, extractPlaces } from '../../../lib/ai.js';
 import { locateAutomatically, savePlace } from '../../../lib/place-ai.js';
-import { fetchCaption, isSocialUrl } from '../../../lib/social.js';
+import { fetchCaption, isSocialUrl, MAX_CAPTION_LENGTH } from '../../../lib/social.js';
+import { fetchYoutubeText } from '../../../lib/youtube.js';
 import { recordUsage } from '../../../lib/usage.js';
 
 const MAX_LINKS_PER_MESSAGE = 3;
@@ -105,7 +106,7 @@ async function collectLinks(env, event) {
     const seen = await env.DB.prepare('SELECT 1 FROM places WHERE line_message_id = ? AND url = ?').bind(event.message.id, url).first();
     if (seen) continue;
 
-    const caption = messageText || (await fetchCaption(url));
+    const caption = messageText || ((await fetchYoutubeText(env, url)) || (await fetchCaption(url))).slice(0, MAX_CAPTION_LENGTH);
     const { places, isAiPending } = await analysePost(env, listId, caption);
     // Never lose a link: if AI found nothing, save the bare link for manual editing (or a later retry).
     const post = { list_id: listId, url, caption, source: 'line', line_message_id: event.message.id };
