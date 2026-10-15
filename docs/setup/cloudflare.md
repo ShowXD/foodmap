@@ -283,9 +283,35 @@ curl -si -X POST https://<專案>.pages.dev/api/line/webhook | head -5
 
 ## 之後更新程式
 
+設好下面的「自動部署」後，**push 到 GitHub 的 `main` 就會自動上線**，不用再手動部署。還沒設定、或要臨時手動部署時：
+
 ```bash
 npm run deploy
 ```
+
+### 自動部署（GitHub Actions）
+
+`.github/workflows/deploy.yml`：每次 push 到 `main`，GitHub 會跑測試 → 部署到 Pages → 刪掉舊部署（只留最新 5 個，加上目前上線的那個，方便在控制台回復）。測試沒過就不會部署。
+
+只要設定一次：
+
+1. **建立 Cloudflare API 權杖**：Cloudflare 右上角頭像 → **我的設定檔** → **API 權杖** → **建立權杖** → 最下面「建立自訂權杖」→ **開始使用**
+   - 權杖名稱：`foodmap GitHub 部署`
+   - 權限：**帳戶** ／ **Cloudflare Pages** ／ **編輯**（只要這一條）
+   - 帳戶資源：**包含** ／ 你的帳戶
+   - 其他留空 → **繼續以顯示摘要** → **建立權杖**，複製權杖（只會顯示一次，不要貼到任何檔案或聊天裡）
+2. **帳戶 ID**：**Workers 和 Pages** 頁面右側「帳戶詳細資料」的 Account ID
+3. **存到 GitHub**：GitHub 上的 repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**，新增兩個：
+   - `CLOUDFLARE_API_TOKEN`：步驟 1 的權杖
+   - `CLOUDFLARE_ACCOUNT_ID`：步驟 2 的帳戶 ID
+4. 測試：repo 的 **Actions** 分頁 → **Deploy** → **Run workflow**，跑完看 Pages 的部署列表有新的一筆
+
+注意：
+
+- **push 到 `main` 就是上線**，push 前確認程式沒問題
+- **資料表變動（下面的 migrations）還是要手動跑，而且要在 push 之前**，否則新程式會碰到還沒有的欄位
+- 權杖存在 GitHub Secrets 裡是加密的，repo 公開也看不到；別人從 fork 送來的 pull request 拿不到它
+- 權杖外洩或不再使用：回到 API 權杖頁面「撤銷」，再建一把新的換上
 
 ### 資料表結構有變動時
 
