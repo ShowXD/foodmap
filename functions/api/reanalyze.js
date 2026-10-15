@@ -1,6 +1,6 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
 import { APIS, recordUsage, takeUserQuota } from '../../lib/usage.js';
-import { extractPlaces } from '../../lib/ai.js';
+import { aiModel, extractPlaces } from '../../lib/ai.js';
 import { fillFromAi } from '../../lib/place-ai.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
@@ -19,7 +19,7 @@ export async function onRequestPost({ request, env, data }) {
   }
 
   await recordUsage(env.DB, 'workers_ai');
-  const { places = [], error } = await extractPlaces(env.AI, place.caption);
+  const { places = [], error } = await extractPlaces(env.AI, place.caption, await aiModel(env.DB));
   if (error === 'unavailable') return json({ error: 'AI 暫時無法使用（可能已達今日免費額度），明天再試' }, 502);
   if (error === 'unusable') return json({ error: 'AI 回傳格式錯誤，請再試一次或手動填寫' }, 502);
   if (places.length === 0) return json({ error: 'AI 在貼文裡找不到店家，請手動填寫' }, 422);

@@ -1,4 +1,4 @@
-import { extractPlaces } from '../../../lib/ai.js';
+import { aiModel, extractPlaces } from '../../../lib/ai.js';
 import { locateAutomatically, savePlace } from '../../../lib/place-ai.js';
 import { fetchCaption, isSocialUrl } from '../../../lib/social.js';
 import { recordUsage } from '../../../lib/usage.js';
@@ -84,7 +84,7 @@ async function analysePost(env, listId, caption) {
   if (!caption || !env.AI) return { places: [], isAiPending: false };
   if (!(await canUseLineAi(env.DB, listId))) return { places: [], isAiPending: true };
   await recordUsage(env.DB, 'workers_ai');
-  const { places = [], error } = await extractPlaces(env.AI, caption);
+  const { places = [], error } = await extractPlaces(env.AI, caption, await aiModel(env.DB));
   return { places, isAiPending: error === 'unavailable' };
 }
 

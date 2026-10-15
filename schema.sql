@@ -57,7 +57,15 @@ CREATE TABLE IF NOT EXISTS places (
   location_source TEXT CHECK (location_source IN ('google', 'manual')),
   location_fetched_at TEXT,
   -- 1 = a LINE link saved while the day's AI limit was used up; analysed later (line/webhook.js retryPendingAi).
-  ai_pending INTEGER NOT NULL DEFAULT 0
+  ai_pending INTEGER NOT NULL DEFAULT 0,
+  -- 1 = a person edited name/address/area/dishes; garble detection and AI re-analysis leave it alone.
+  hand_edited INTEGER NOT NULL DEFAULT 0
+);
+
+-- Site-wide choices a site admin changes in the app (key 'ai_model').
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 -- LINE groups the bot has been added to. Links are only collected once a site admin

@@ -232,10 +232,27 @@ function renderUsage(entry) {
   return item;
 }
 
+const aiModelSelect = document.getElementById('ai-model');
+
 async function loadUsage() {
-  const usage = await api('/api/usage');
+  const [usage, settings] = await Promise.all([api('/api/usage'), api('/api/settings')]);
   document.getElementById('usage-list').replaceChildren(...usage.map(renderUsage));
+  aiModelSelect.replaceChildren(...settings.models.map((model) => new Option(model.label, model.id)));
+  aiModelSelect.value = settings.ai_model;
 }
+
+aiModelSelect.addEventListener('change', async () => {
+  aiModelSelect.disabled = true;
+  try {
+    await api('/api/settings', 'PUT', { ai_model: aiModelSelect.value });
+    message.textContent = `AI 模型已改為：${aiModelSelect.selectedOptions[0].textContent}`;
+  } catch (error) {
+    message.textContent = `更改失敗：${error.message}`;
+    await loadUsage();
+  } finally {
+    aiModelSelect.disabled = false;
+  }
+});
 
 /** Refreshes one admin page (usage / groups / line-groups / accounts); called by app.js each time it opens. */
 export function showAdmin(view) {
