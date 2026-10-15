@@ -291,34 +291,41 @@ npm run deploy
 
 ### 自動部署（GitHub Actions）
 
-`.github/workflows/deploy.yml`：每次 push 到 `main`，GitHub 會跑測試 → 部署到 Pages → 刪掉舊部署（只留最新 5 個，加上目前上線的那個，方便在控制台回復）。測試沒過就不會部署。
+`.github/workflows/deploy.yml`：每次 push 到 `main`，GitHub 會跑測試 → **套用新的資料表變動（migrations）** → 部署到 Pages → 刪掉舊部署（只留最新 5 個，加上目前上線的那個，方便在控制台回復）。測試或資料表變動失敗就不會部署，網站維持舊版。
 
 只要設定一次：
 
 1. **建立 Cloudflare API 權杖**：Cloudflare 右上角頭像 → **我的設定檔** → **API 權杖** → **建立權杖** → 最下面「建立自訂權杖」→ **開始使用**
    - 權杖名稱：`foodmap GitHub 部署`
-   - 權限：**帳戶** ／ **Cloudflare Pages** ／ **編輯**（只要這一條）
+   - 權限兩條：**帳戶** ／ **Cloudflare Pages** ／ **編輯**，以及 **帳戶** ／ **D1** ／ **編輯**（套用資料表變動用）
    - 帳戶資源：**包含** ／ 你的帳戶
    - 其他留空 → **繼續以顯示摘要** → **建立權杖**，複製權杖（只會顯示一次，不要貼到任何檔案或聊天裡）
 2. **帳戶 ID**：**Workers 和 Pages** 頁面右側「帳戶詳細資料」的 Account ID
 3. **存到 GitHub**：GitHub 上的 repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**，新增兩個：
    - `CLOUDFLARE_API_TOKEN`：步驟 1 的權杖
    - `CLOUDFLARE_ACCOUNT_ID`：步驟 2 的帳戶 ID
-4. 測試：repo 的 **Actions** 分頁 → **Deploy** → **Run workflow**，跑完看 Pages 的部署列表有新的一筆
+4. **標記已經手動跑過的資料表變動（只做一次）**：自動套用靠資料庫裡的 `d1_migrations` 表記住跑過哪些檔案。這個資料庫之前都是手動升級的，要先標記 0002～0016 已套用，否則第一次會從頭重跑而失敗（例如欄位已存在）：
+
+   ```bash
+   npx wrangler d1 execute foodmap --remote --command "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL); INSERT OR IGNORE INTO d1_migrations (name) VALUES ('0002_multi_place.sql'),('0003_users.sql'),('0004_lists.sql'),('0005_extract_usage.sql'),('0006_line.sql'),('0007_personal.sql'),('0008_location.sql'),('0009_api_usage.sql'),('0010_thumbnails.sql'),('0011_profile.sql'),('0012_friends.sql'),('0013_identities.sql'),('0014_invites.sql'),('0015_ai_pending.sql'),('0016_hand_edited_settings.sql');"
+   ```
+
+   確認：`npx wrangler d1 migrations list foodmap --remote` 應顯示「No migrations to apply」
+5. 測試：repo 的 **Actions** 分頁 → **Deploy** → **Run workflow**，跑完看 Pages 的部署列表有新的一筆
 
 注意：
 
-- **push 到 `main` 就是上線**，push 前確認程式沒問題
-- **資料表變動（下面的 migrations）還是要手動跑，而且要在 push 之前**，否則新程式會碰到還沒有的欄位
+- **push 到 `main` 就是上線**，包括 `migrations/` 裡新增的資料表變動會直接套用到正式資料庫；push 前確認程式與變動沒問題，會刪資料的變動要特別小心
+- 新增資料表變動：在 `migrations/` 加一個編號下一號的檔案（例如 `0017_xxx.sql`），同時更新 `schema.sql`，push 後會自動套用
 - 權杖存在 GitHub Secrets 裡是加密的，repo 公開也看不到；別人從 fork 送來的 pull request 拿不到它
 - 權杖外洩或不再使用：回到 API 權杖頁面「撤銷」，再建一把新的換上
 
 ### 資料表結構有變動時
 
-`migrations/` 資料夾裡的 SQL 檔是給**已經建好的資料庫**升級用的，依編號順序各執行一次就好，**要在部署新程式之前執行**：
+`migrations/` 資料夾裡的 SQL 檔是給**已經建好的資料庫**升級用的，依編號順序各執行一次。設好上面的「自動部署」後，push 時 GitHub 會自動套用還沒跑過的檔案，不用手動。沒用自動部署時，要在部署新程式之前自己跑：
 
 ```bash
-npx wrangler d1 execute foodmap --remote --file=./migrations/<檔名>.sql
+npx wrangler d1 migrations apply foodmap --remote
 ```
 
 | 檔案 | 內容 | 誰需要跑 |
