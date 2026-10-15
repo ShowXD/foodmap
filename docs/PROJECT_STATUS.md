@@ -202,6 +202,12 @@
   - 後端：`/api/places` POST 重複檢查改在同一句 INSERT（雙擊不會存兩筆；409 不再附 `place`）；PATCH 改用 `findAccessiblePlace`；`readCookie` 遇到格式錯誤的 cookie 回 null（原本整站 500）；`retryPendingAi` 出錯時把已認領的列標回 `ai_pending=1`；`schema.sql` 移除不再使用的 `extract_usage`（正式 DB 的表留著無害，未 DROP）；`cloudflare.md` 更正為 `user_daily_usage`
   - 刻意不做：16 個檔案各自的 `json()` 一行 helper 不合併；社群頁轉址改 `redirect: 'manual'`（目前抓完會再檢查網域，風險低）；`/api/places` 回傳完整 caption（清單破百筆再改成只回 has_caption）
   - 搜尋改在前端（使用者決定「今天吃什麼」永遠從整個清單抽，要縮小範圍用標籤）：`/api/places` 一律回傳整個清單（移除 `q` 參數與 LIKE 查詢）；`app.js` `matchesSearch` 比對店名、食物、地區、地址、標籤、備註、貼文文字，只影響清單與地圖；「今天吃什麼」與標籤選單用整個清單。打字不再發請求。本機驗證：搜尋「牛肉」清單剩 1 家、吃什麼仍從 6 家抽
+- **AI 模型可切換＋疑似亂碼偵測（2026-10-15；要先在 remote 跑 0016）**：
+  - 模型比較（正式資料 4 則貼文）：Llama 3.3 70B fp8-fast 4/4、欄位最完整，但第一輪曾整則亂碼（證實是亂碼來源）；Qwen3 30B 4/4、額度省約 43%、欄位較差；Gemma 4 26B 4/4、品質好但每則約 50 秒（LINE 背景工作約 30 秒會被中斷，不提供）；GLM 4.7 Flash 3/4、gpt-oss 20B 2/4；DeepSeek V4 Flash 免費方案不能用。其他模型以 OpenAI 格式（`choices[0].message.content`）回傳，`extractPlaces` 兩種都讀
+  - `lib/ai.js` `AI_MODELS`（Llama 預設、Qwen3）＋`aiModel(db)`；`settings` 表 key `ai_model`；`/api/settings` GET/PUT 只限管理員、只收清單內模型；API 用量頁有選單。所有 AI 呼叫（新增表單、重新分析、LINE、背景補分析）都用選定模型
+  - `garbledFields(place)`：店名／地址／地區有貼文沒出現的中文字＝疑似亂碼（沒貼文文字或 `hand_edited` 的不判斷）；正式資料試算 55 家抓出 16 家，全為真亂碼。`/api/places` GET 每筆附 `garbled`；PATCH 改到店名／地址／地區／食物時設 `hand_edited=1`
+  - 「待整理」拆成「沒店名」「沒定位」（有店名沒座標）「疑似亂碼」三個篩選；卡片顯示「⚠️ 疑似亂碼：店名、地址」；重新分析（單筆與整批）也處理疑似亂碼：只覆蓋亂碼欄位、其餘空白才填，已定位的只有店名或地址被修正時才重新定位
+  - 不做：定位後用 Google 店名取代 AI 店名——Google 地圖平台條款不允許長期儲存 Places 內容（只有 place ID 可存），自動寫入會違反；使用者在定位對話框看到 Google 店名後可自行編輯
 - **重新分析後沒定位的提示（2026-10-15）**：使用者回報「重新辨識成功，待整理數量沒減少」。原因：「待整理」＝沒店名**或**沒定位（前端即時判斷，非標籤）；補上店名後自動定位只採用 Google 第一筆且店名或地址相符，不符就不放（正式資料家人清單 42 家待整理中 29 家是有店名沒定位）。改為 `locateAutomatically` 回傳是否定位、`/api/reanalyze` 回 `located`；單筆分析沒定位就直接打開定位對話框（以新店名搜尋，算使用者的地點搜尋額度）；整批分析結束顯示「幾家補上店名、幾家沒能自動定位」
 - **AI 標籤被濾光（2026-10-15 修正）**：亂碼過濾原本也要求標籤每個字出現在原文，但標籤多為 AI 自行歸納（「牛排」「平價」），正式資料中重新分析過的店（id 55、63、66、68）標籤全空。改為標籤不比對原文，只去掉 `#`、`|` 等符號並去重；店名／地址／地區／菜色仍比對。另外編輯頁「AI 自動填入」原本只補空白欄位，已填（含亂碼）的不會被修正 → 改為：空白直接填，與現有內容不同時 `confirm` 詢問是否取代。已存的空標籤店家：到編輯頁按「AI 自動填入」即可補上
 - **資安檢查（2026-10-15）**：整份程式唯讀審查，無嚴重／高風險。已確認沒問題：Access JWT 驗證（RS256、kid、iss/aud/exp/nbf）、`PUBLIC_PATHS` 精確比對、CSRF、每個 API 都經 `findAccessibleList`／`findAccessiblePlace`／`findManageableGroup`、SQL 全部參數化、CSV 公式注入、無 innerHTML、大頭貼權限與檔案檢查、webhook HMAC、邀請碼 256 位元雜湊單次、無外洩金鑰。已修：
