@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fffaf5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+  <meta name="robots" content="noindex">
+  <title>美食地圖</title>
+  <!-- Public page shown before sign-in: everything it needs lives in /welcome/, the one path Access bypasses. -->
+  <style>
+    :root { color-scheme: light dark; --bg: #fffaf5; --card: #ffffff; --text: #212529; --muted: #6c757d; --accent: #d9480f; --accent-text: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1a1a1a; --card: #262626; --text: #f1f3f5; --muted: #adb5bd; --accent: #ff8a50; --accent-text: #1a1a1a; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; font-family: system-ui, "Noto Sans TC", sans-serif; background: var(--bg); color: var(--text); }
+    main { width: 100%; max-width: 420px; padding: calc(env(safe-area-inset-top) + 24px) 16px calc(env(safe-area-inset-bottom) + 24px); text-align: center; }
+    .logo { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 8px 24px rgb(217 72 15 / 0.3); }
+    h1 { font-size: 1.75rem; margin: 16px 0 4px; }
+    .tagline { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
+    ul { list-style: none; padding: 16px; margin: 0 0 24px; background: var(--card); border-radius: 16px; text-align: left; line-height: 1.5; }
+    li + li { margin-top: 12px; }
+    li span { margin-right: 8px; }
+    .invite { padding: 12px; margin: 0 0 16px; border-radius: 12px; border: 1px solid var(--accent); color: var(--accent); }
+    .sign-in { display: block; padding: 14px; border-radius: 12px; background: var(--accent); color: var(--accent-text); font-size: 1.1rem; font-weight: 600; text-decoration: none; }
+    .sign-in:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+    .hint, footer { color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+    footer a { color: inherit; }
+  </style>
+</head>
+<body>
+  <main>
+    <svg class="logo" viewBox="0 0 512 512" role="img" aria-label="美食地圖">
+      <rect width="512" height="512" fill="#d9480f"/>
+      <path d="M256 96c-70 0-126 56-126 126 0 94 126 194 126 194s126-100 126-194c0-70-56-126-126-126z" fill="#fff"/>
+      <circle cx="256" cy="222" r="48" fill="#d9480f"/>
+    </svg>
+    <h1>美食地圖</h1>
+    <p class="tagline">把在 IG、FB、Threads、YouTube 看到的美食<br>存起來，想吃的時候在地圖上找。</p>
+    <ul>
+      <li><span aria-hidden="true">🔗</span>貼上連結，AI 幫你整理店名、地址、菜色</li>
+      <li><span aria-hidden="true">🗺️</span>在地圖上看附近收藏過的店</li>
+      <li><span aria-hidden="true">👨‍👩‍👧</span>和家人朋友一起收藏，記錄吃過與評分</li>
+    </ul>
+    <p class="invite" id="invite" hidden>你收到群組邀請，登入後會自動加入。</p>
+    <a class="sign-in" id="sign-in" href="/">登入開始使用</a>
+    <p class="hint">可以用 Google 帳號、Email 驗證碼或帳號密碼登入。</p>
+    <footer><a href="/privacy">使用條款與隱私權</a></footer>
+  </main>
+  <script src="welcome.js"></script>
+</body>
+</html>

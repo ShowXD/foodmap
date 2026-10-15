@@ -174,6 +174,8 @@ npm run deploy
 
    隱私權頁要讓還沒登入的人也看得到（Google 登入畫面會連過去），所以要替它建一個略過登入的應用程式，做法同 [line.md](line.md) 第 6 步：
    **Zero Trust** → **Access 控制** → **應用程式** → **建立新應用程式** → **自我裝載**，名稱 `foodmap 隱私權頁`，目的地網域選 `<專案>.pages.dev`、**路徑**填 `privacy`，原則動作選 **略過（Bypass）**、包含 **所有人（Everyone）**。程式只公開 `/privacy` 這一頁（樣式內嵌，不需公開其他檔案）。
+
+   **歡迎頁（建議）**：沒登入的人直接開網址會看到 Cloudflare 的登入畫面；改分享 `https://<專案>.pages.dev/welcome/`，對方會先看到 App 自己的歡迎頁，按「登入開始使用」才進 Cloudflare 登入（群組邀請連結已自動改成這個網址，邀請碼會一路帶進 App）。同樣建一個略過登入的應用程式：名稱 `foodmap 歡迎頁`，目的地網域選 `<專案>.pages.dev`、**路徑**填 `welcome`，原則動作選 **略過（Bypass）**、包含 **所有人（Everyone）**。程式只公開 `/welcome/` 和它的 `welcome.js`。驗證：用無痕視窗開 `/welcome/` 看得到歡迎頁，開 `/` 仍被導到 Cloudflare 登入頁。
 3. 注意事項：
    - Cloudflare Zero Trust 免費方案最多 **50 位使用者**（所有登入方式合計，被 App 停用的帳號仍會佔名額）；名額快滿時到 Zero Trust → **我的團隊 → 使用者** 移除不用的人。
    - 拿到網址的陌生人也能登入並使用自己的清單；費用受每人每日上限與 Google Cloud 全站配額保護。發現不認識的帳號，在「帳號管理」停用。

@@ -106,7 +106,7 @@ async function loadInvites() {
 document.getElementById('make-invite').addEventListener('click', async () => {
   try {
     const { code } = await api('POST', { list_id: listId }, '', '/api/invites');
-    inviteUrl.value = `${location.origin}/?join=${code}`;
+    inviteUrl.value = `${location.origin}/welcome/?join=${code}`;
     newInvite.hidden = false;
     await loadInvites();
   } catch (error) {

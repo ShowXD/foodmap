@@ -118,6 +118,9 @@ test('middleware fails closed and never trusts DEV_USER_EMAIL outside localhost'
   // The privacy page is public (linked from Google's consent screen); nothing else becomes public with it.
   assert.ok((await runMiddleware('https://foodmap.pages.dev/privacy', {})).passed);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/privacy-and-more', { DB: db })).response.status, 503);
+  assert.ok((await runMiddleware('https://foodmap.pages.dev/welcome/', {})).passed);
+  assert.ok((await runMiddleware('https://foodmap.pages.dev/welcome/welcome.js', {})).passed);
+  assert.equal((await runMiddleware('https://foodmap.pages.dev/welcome/../app.js', { DB: db })).response.status, 503);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/style.css', { DB: db })).response.status, 503);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', { DB: db })).response.status, 503);
   assert.equal((await runMiddleware('https://foodmap.pages.dev/', { DB: db, DEV_USER_EMAIL: 'me@example.com' })).response.status, 503);
