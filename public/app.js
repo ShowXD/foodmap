@@ -274,6 +274,13 @@ async function sharePlace(place) {
   }
 }
 
+// Esc keeps the dialog's previous returnValue, so without this it would redo the last choice
+// (e.g. delete this shop's 吃過 because another shop's dialog was last closed with 取消吃過).
+function openDialog(dialog) {
+  dialog.returnValue = '';
+  dialog.showModal();
+}
+
 // ---- 吃過 + rating dialog ----
 let visitingPlace = null;
 
@@ -286,7 +293,7 @@ async function openVisitDialog(place) {
   $('visit-remove').hidden = !place.my_visited_at;
   const others = $('visit-others');
   others.replaceChildren();
-  visitDialog.showModal();
+  openDialog(visitDialog);
   try {
     const visits = await api('GET', null, `?place=${place.id}`, '/api/visits');
     others.replaceChildren(...visits.filter((v) => !v.is_mine).map((v) => {
@@ -714,7 +721,7 @@ function openLocateDialog(place) {
   $('locate-title').textContent = isFixing ? `修正「${place.name || '這家店'}」的位置` : `${place.name || '這家店'}在哪裡？`;
   locateForm.elements.query.value = isFixing ? place.address ?? '' : '';
   $('locate-candidates').replaceChildren();
-  locateDialog.showModal();
+  openDialog(locateDialog);
   if (isFixing) {
     locateMessage.textContent = '輸入完整地址（例如：台北市大安區復興南路一段 1 號）或店名，再按搜尋';
     locateForm.elements.query.focus();
@@ -1163,7 +1170,7 @@ $('remove-avatar').addEventListener('click', async () => {
 $('edit-profile').addEventListener('click', () => {
   profileForm.elements.display_name.value = displayName(profile);
   $('remove-avatar').hidden = !profile.avatarVersion;
-  profileDialog.showModal();
+  openDialog(profileDialog);
 });
 
 profileDialog.addEventListener('close', async () => {
