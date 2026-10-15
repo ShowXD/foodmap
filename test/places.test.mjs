@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isHttpUrl, pickFields, onRequestPost } from '../functions/api/places.js';
+import { pickFields, onRequestPost } from '../functions/api/places.js';
+import { isHttpUrl } from '../lib/social.js';
 
 test('isHttpUrl only accepts http(s)', () => {
   assert.ok(isHttpUrl('https://www.instagram.com/reel/abc/'));

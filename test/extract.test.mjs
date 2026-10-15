@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isSocialUrl, parseOgText, parsePlaces, groundPlaces, onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
+import { onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
+import { parsePlaces, groundPlaces } from '../lib/ai.js';
+import { isSocialUrl, parseOgText } from '../lib/social.js';
 import { ensureUser } from '../lib/users.js';
 import { createTestDb } from './d1.mjs';
 

@@ -1,26 +1,16 @@
 import { findAccessibleList, findAccessiblePlace } from '../../lib/lists.js';
 import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
-import { retryPendingAi } from './line/webhook.js';
+import { retryPendingAi } from '../../lib/place-ai.js';
+import { isHttpUrl, MAX_CAPTION_LENGTH } from '../../lib/social.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
 const SOURCES = ['line', 'share', 'manual'];
 const STATUSES = ['todo', 'visited'];
-// Caps keep one row (and the LIKE search) small; captions mirror the AI extraction limit.
-const MAX_FIELD_LENGTH = { caption: 5000, note: 2000 };
+// Caps keep one row small; captions mirror the AI extraction limit.
+const MAX_FIELD_LENGTH = { caption: MAX_CAPTION_LENGTH, note: 2000 };
 const DEFAULT_MAX_FIELD_LENGTH = 500;
-const MAX_URL_LENGTH = 2048;
 
 const json = (body, status = 200) => Response.json(body, { status });
-
-// Rejects javascript:/data: URLs, since the url is rendered as a link.
-export function isHttpUrl(text) {
-  if (typeof text !== 'string' || text.length > MAX_URL_LENGTH) return false;
-  try {
-    return ['http:', 'https:'].includes(new URL(text).protocol);
-  } catch {
-    return false;
-  }
-}
 
 // Returns only whitelisted, string-valued fields, or an error message.
 export function pickFields(body) {

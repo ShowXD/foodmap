@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
-import { onRequestPost, parseLinks, isValidLineSignature, retryPendingAi, RETRY_AI_BELOW } from '../functions/api/line/webhook.js';
+import { onRequestPost, parseLinks, isValidLineSignature } from '../functions/api/line/webhook.js';
+import { retryPendingAi, RETRY_AI_BELOW } from '../lib/place-ai.js';
 import * as lineGroups from '../functions/api/line-groups.js';
 
 const SECRET = 'test-channel-secret';

@@ -1,5 +1,5 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
-import { fetchSocialPage, isSocialUrl, readLimited, readOgMeta } from '../api/extract.js';
+import { fetchSocialPage, isSocialUrl, readLimited, readOgMeta } from '../../lib/social.js';
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 1024 * 1024;

@@ -1,7 +1,7 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
 import { APIS, recordUsage, takeUserQuota } from '../../lib/usage.js';
-import { extractPlaces } from './extract.js';
-import { fillFromAi } from './line/webhook.js';
+import { extractPlaces } from '../../lib/ai.js';
+import { fillFromAi } from '../../lib/place-ai.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
 
