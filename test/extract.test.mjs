@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
-import { parsePlaces, groundPlaces } from '../lib/ai.js';
+import { garbledFields, parsePlaces, groundPlaces } from '../lib/ai.js';
 import { fetchSocialPage, isSocialUrl, parseOgText } from '../lib/social.js';
 import { ensureUser } from '../lib/users.js';
 import { createTestDb } from './d1.mjs';
@@ -73,6 +73,15 @@ test('groundPlaces drops names, places and dishes the post never says, but keeps
   assert.deepEqual(groundPlaces([garbled, good], post), [
     { name: '江家餛飩', dishes: '紅油鮮蝦炒手麵、餛飩湯', area: '台中市 西區', address: '台中市西區華美街204號', tags: '台中美食 平價' },
   ]);
+});
+
+test('garbledFields flags name/address/area with characters the post never uses, unless edited by hand', () => {
+  const caption = '#江家餛飩 📍臺中市西區華美街204號';
+  const garbled = { caption, name: '江家予駕', address: '號中市西園區華美街204號', area: '台中 西區', dishes: '亂寫的菜' };
+  assert.deepEqual(garbledFields(garbled), ['name', 'address']);
+  assert.deepEqual(garbledFields({ ...garbled, name: '江家餛飩', address: '台中市西區華美街204號' }), []);
+  assert.deepEqual(garbledFields({ ...garbled, hand_edited: 1 }), [], 'a person\'s own wording is trusted');
+  assert.deepEqual(garbledFields({ ...garbled, caption: '' }), [], 'nothing to compare against');
 });
 
 test('extract returns 503 when the AI binding is missing', async () => {

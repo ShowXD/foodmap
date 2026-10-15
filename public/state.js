@@ -32,8 +32,13 @@ export const mapsUrl = (place) => {
 };
 export const isLocated = (place) => place.lat != null && place.lng != null;
 export const latLngOf = (place) => ({ lat: place.lat, lng: place.lng });
-// LINE places may have only a link (no name) or no map position yet.
-export const needsTidying = (place) => !place.name || !isLocated(place);
+// What a place is still missing (LINE places may have only a link), each its own filter chip.
+// A nameless place counts only as 沒店名: it can't be placed until it has a name.
+export const PLACE_ISSUES = {
+  'no-name': { label: '沒店名', test: (place) => !place.name },
+  'no-location': { label: '沒定位', test: (place) => Boolean(place.name) && !isLocated(place) },
+  garbled: { label: '疑似亂碼', test: (place) => Boolean(place.garbled?.length) },
+};
 export const tagsOf = (place) => String(place.tags ?? '').split(/\s+/).filter(Boolean);
 
 function distanceKm(from, to) {
@@ -57,7 +62,7 @@ export function matchesFilter(place) {
   if (filter.mode === 'todo' && place.my_visited_at) return false;
   if (filter.mode === 'visited' && !place.my_visited_at) return false;
   if (filter.mode === 'starred' && !place.starred) return false;
-  if (filter.mode === 'untidy' && !needsTidying(place)) return false;
+  if (PLACE_ISSUES[filter.mode] && !PLACE_ISSUES[filter.mode].test(place)) return false;
   if (filter.mode === 'near' && !(distanceTo(place) != null && distanceTo(place) <= filter.radius)) return false;
   if (filter.tag && !tagsOf(place).includes(filter.tag)) return false;
   return true;

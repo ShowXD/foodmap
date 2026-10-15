@@ -149,6 +149,29 @@ test('AI 重新分析: fills a nameless place, locates it by address when names 
   googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
 });
 
+test('疑似亂碼: the list flags it, AI re-analysis replaces the garbled fields, hand edits are left alone', async () => {
+  const { DB, env, mom, call, row } = await setup();
+  DB.sqlite.exec(`INSERT INTO places (id, list_id, url, caption, name, address, dishes, source) VALUES
+    (30, 1, 'https://fb.watch/g', '#江家餛飩 📍臺中市西區華美街204號 紅油炒手', '江家予駕', '號中市西園區華美街204號', '紅油炒手', 'line')`);
+  env.AI = { run: async () => ({ response: { places: [{ name: '江家餛飩', address: '臺中市西區華美街204號', dishes: '炒手' }] } }) };
+  googleReply = () => Response.json({ places: [{ ...googleHit('江家餛飩'), formattedAddress: '403台灣台中市西區華美街204號' }] });
+
+  const listed = (await call(places.onRequestGet, mom, { method: 'GET', query: '?list=1' })).body.find((place) => place.id === 30);
+  assert.deepEqual(listed.garbled, ['name', 'address']);
+
+  const fixed = await call(reanalyze.onRequestPost, mom, { body: { place_id: 30 } });
+  assert.deepEqual([fixed.status, fixed.body.located], [200, true]);
+  assert.deepEqual([row(30).name, row(30).address, row(30).dishes], ['江家餛飩', '臺中市西區華美街204號', '紅油炒手'], 'only garbled fields are replaced');
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 30 } })).status, 409, 'nothing left to fix');
+
+  // Once a person edits the name, it is never flagged or replaced.
+  DB.sqlite.exec("UPDATE places SET name = '江家予駕' WHERE id = 30");
+  await call(places.onRequestPatch, mom, { method: 'PATCH', body: { id: 30, name: '江家（我自己取的名字）' } });
+  assert.equal(row(30).hand_edited, 1);
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 30 } })).status, 409);
+  googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
+});
+
 test('LINE: a shop is located automatically only when Google\'s top hit has the same name', async () => {
   const { DB, env } = await setup();
   DB.sqlite.exec("INSERT INTO line_groups (group_id, list_id) VALUES ('Cgroup', 1)");

@@ -1,11 +1,13 @@
 import { findAccessibleList, findAccessiblePlace } from '../../lib/lists.js';
 import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.js';
+import { garbledFields } from '../../lib/ai.js';
 import { retryPendingAi } from '../../lib/place-ai.js';
 import { isHttpUrl, MAX_CAPTION_LENGTH } from '../../lib/social.js';
 import { STORAGE_LIMITS, takeUserQuota } from '../../lib/usage.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
 const SOURCES = new Set(['line', 'share', 'manual']);
+const HAND_EDIT_FIELDS = new Set(['name', 'address', 'area', 'dishes']);
 const STATUSES = new Set(['todo', 'visited']);
 // Caps keep one row small; captions mirror the AI extraction limit.
 const MAX_FIELD_LENGTH = { caption: MAX_CAPTION_LENGTH, note: 2000 };
@@ -65,7 +67,8 @@ export async function onRequestGet({ request, env, data, waitUntil }) {
     )
     .bind(list.id, data.user.id)
     .all();
-  return json(results);
+  // garbled: fields whose wording the post never uses, shown as 疑似亂碼 and offered for AI re-analysis.
+  return json(results.map((place) => ({ ...place, garbled: garbledFields(place) })));
 }
 
 export async function onRequestPost({ request, env, data }) {
@@ -110,9 +113,11 @@ export async function onRequestPatch({ request, env, data }) {
 
   // Field names come from pickFields' allow-list, never from the request.
   const assignments = keys.map((key) => `${key} = ?`).join(', ');
+  // A person's own wording is never flagged as garbled or replaced by AI re-analysis.
+  const isHandEdit = keys.some((key) => HAND_EDIT_FIELDS.has(key));
   const place = await env.DB
     // Once a person edits it, the background AI retry leaves it alone.
-    .prepare(`UPDATE places SET ${assignments}, ai_pending = 0 WHERE id = ? RETURNING *`)
+    .prepare(`UPDATE places SET ${assignments}, ai_pending = 0${isHandEdit ? ', hand_edited = 1' : ''} WHERE id = ? RETURNING *`)
     .bind(...Object.values(fields), body.id)
     .first();
   return json(place);

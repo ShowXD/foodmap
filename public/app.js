@@ -7,7 +7,7 @@ import {
 } from './map.js';
 import { $, api, openDialog, readSetting, saveSetting } from './shared.js';
 import {
-  distanceTo, formatDistance, isLocated, mapsUrl, matchesFilter, needsTidying, state, tagsOf,
+  distanceTo, formatDistance, isLocated, mapsUrl, matchesFilter, PLACE_ISSUES, state, tagsOf,
 } from './state.js';
 
 const searchInput = $('search');
@@ -98,7 +98,7 @@ function renderListItem(place, itemLayout) {
   button.classList.toggle('visited', Boolean(place.my_visited_at));
 
   const name = document.createElement('strong');
-  name.textContent = place.name || '（待整理）';
+  name.textContent = place.name || '（還沒有店名）';
   const distance = distanceTo(place);
   const details = document.createElement('span');
   details.className = 'meta';
@@ -126,7 +126,7 @@ function renderPlace(place) {
   card.prepend(thumbnailFor(place, 'thumb-card'));
   const isVisited = Boolean(place.my_visited_at);
   card.classList.toggle('visited', isVisited);
-  card.querySelector('.name').textContent = place.name || '（待整理：還沒有店名）';
+  card.querySelector('.name').textContent = place.name || '（還沒有店名）';
   card.querySelector('.badge-new').hidden = !place.is_new;
   card.querySelector('.dishes').textContent = place.dishes || '';
   const distance = distanceTo(place);
@@ -135,6 +135,7 @@ function renderPlace(place) {
     place.area,
     place.tags,
     place.source === 'line' && '來自 LINE',
+    place.garbled?.length && `⚠️ 疑似亂碼：${place.garbled.map((field) => GARBLED_LABELS[field]).join('、')}`,
   ].filter(Boolean).join(' · ');
   card.querySelector('.family').textContent = familySummary(place);
   card.querySelector('.note').textContent = [place.note, place.my_note && `我的心得：${place.my_note}`].filter(Boolean).join('\n');
@@ -174,7 +175,7 @@ async function reanalyzePlace(place, button) {
   try {
     const { located } = await api('POST', { place_id: place.id }, '', '/api/reanalyze');
     await loadPlaces();
-    // Named now but not on the map yet, so it would stay in 待整理: let the person pick the right shop.
+    // Named now but not on the map yet (沒定位): let the person pick the right shop.
     const updated = state.places.find((candidate) => candidate.id === place.id);
     if (!located && updated) openLocateDialog(updated);
   } catch (error) {
@@ -184,7 +185,9 @@ async function reanalyzePlace(place, button) {
   }
 }
 
-const canReanalyze = (place) => !place.name && Boolean(place.caption);
+const GARBLED_LABELS = { name: '店名', address: '地址', area: '地區' };
+// Nameless, or garbled by an earlier AI run; either way the saved post text is there to try again.
+const canReanalyze = (place) => Boolean(place.caption) && (!place.name || Boolean(place.garbled?.length));
 const reanalyzeAllButton = $('reanalyze-all');
 reanalyzeAllButton.addEventListener('click', async () => {
   const waiting = state.places.filter(canReanalyze);
@@ -212,8 +215,8 @@ reanalyzeAllButton.addEventListener('click', async () => {
     await loadPlaces();
   }
   const summary = [
-    stopped ? `分析了 ${done} 家後停止（${stopped.message}）` : `分析完成，${named} 家補上店名`,
-    notLocated && `其中 ${notLocated} 家沒能自動定位，還留在「待整理」，請點開按「📍 定位」選擇正確的店`,
+    stopped ? `分析了 ${done} 家後停止（${stopped.message}）` : `分析完成，${named} 家已補上或修正店家資料`,
+    notLocated && `其中 ${notLocated} 家沒能自動定位，在「沒定位」裡，請點開按「📍 定位」選擇正確的店`,
   ].filter(Boolean).join('；');
   alert(summary);
 });
@@ -304,10 +307,12 @@ function chip(label, isActive, onClick) {
 const byChineseOrder = (a, b) => a.localeCompare(b, 'zh-Hant');
 
 function renderChips() {
-  const untidy = state.places.filter(needsTidying).length;
   const modes = [['all', '全部'], ['todo', '未吃'], ['visited', '吃過'], ['starred', '★ 想吃']];
   if (state.myPosition) modes.splice(1, 0, ...NEAR_RADII_KM.map((km) => ['near', `📍 ${km} 公里`, km]));
-  if (untidy) modes.push(['untidy', `待整理 ${untidy}`]);
+  for (const [mode, { label, test }] of Object.entries(PLACE_ISSUES)) {
+    const count = state.places.filter((place) => test(place)).length;
+    if (count) modes.push([mode, `${label} ${count}`]);
+  }
   const tags = [...new Set(state.places.flatMap(tagsOf))].sort(byChineseOrder);
   // The list and the map share one filter, so both rows show the same chips.
   for (const container of [filterChips, $('map-chips')]) {
@@ -338,7 +343,7 @@ function renderPlaces() {
   placeList.replaceChildren(...shown.map((place) => renderListItem(place, layout)));
   const waitingForAi = state.places.filter(canReanalyze).length;
   reanalyzeAllButton.hidden = !waitingForAi;
-  if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 待整理的 ${waitingForAi} 家全部 AI 重新分析`;
+  if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 沒店名或疑似亂碼的 ${waitingForAi} 家全部 AI 重新分析`;
   if (shown.length) listMessage.textContent = '';
   else if (!state.places.length) listMessage.textContent = '還沒有收藏，按下方＋新增一家吧';
   else listMessage.textContent = searchInput.value.trim() ? '找不到符合的店' : '沒有符合篩選的店';
