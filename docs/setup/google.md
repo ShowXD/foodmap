@@ -50,7 +50,7 @@ Google 條款規定：
 
 **金鑰 2：伺服器用（名稱 `foodmap-server`）**
 - 應用程式限制：**無**。Cloudflare 的對外 IP 不固定，沒辦法設 IP 限制。
-- API 限制：**限制金鑰** → 只勾 **Places API (New)**
+- API 限制：**限制金鑰** → 勾 **Places API (New)**，有啟用 YouTube 的話再勾 **YouTube Data API v3**
 - 這把金鑰**只存在 Cloudflare secret**，不會出現在網頁或 repo 裡。
 
 > 瀏覽器用的金鑰一定會被看到，這是正常的；靠「只能在你的網址使用」和「只能用地圖 API」來保護。伺服器用的金鑰則絕對不能外流，外流就到憑證頁刪掉重建。

@@ -202,6 +202,11 @@
   - 後端：`/api/places` POST 重複檢查改在同一句 INSERT（雙擊不會存兩筆；409 不再附 `place`）；PATCH 改用 `findAccessiblePlace`；`readCookie` 遇到格式錯誤的 cookie 回 null（原本整站 500）；`retryPendingAi` 出錯時把已認領的列標回 `ai_pending=1`；`schema.sql` 移除不再使用的 `extract_usage`（正式 DB 的表留著無害，未 DROP）；`cloudflare.md` 更正為 `user_daily_usage`
   - 刻意不做：16 個檔案各自的 `json()` 一行 helper 不合併；社群頁轉址改 `redirect: 'manual'`（目前抓完會再檢查網域，風險低）；`/api/places` 回傳完整 caption（清單破百筆再改成只回 has_caption）
   - 搜尋改在前端（使用者決定「今天吃什麼」永遠從整個清單抽，要縮小範圍用標籤）：`/api/places` 一律回傳整個清單（移除 `q` 參數與 LIKE 查詢）；`app.js` `matchesSearch` 比對店名、食物、地區、地址、標籤、備註、貼文文字，只影響清單與地圖；「今天吃什麼」與標籤選單用整個清單。打字不再發請求。本機驗證：搜尋「牛肉」清單剩 1 家、吃什麼仍從 6 家抽
+- **AI 自動模式、截圖辨識、YouTube 完整文字（2026-10-15）**：
+  - 自動模式（新預設，設定值 `auto`）：先 Llama；亂碼過濾刪掉欄位（`lost > 0`）或 Llama 失敗時改用 Qwen 再跑一次，取有效欄位（店名／食物／地區／地址）較多的結果。第二次呼叫不另計入用量（ponytail：只在亂碼時發生）
+  - 截圖辨識：新增頁「📷 用截圖 AI 辨識」→ 手機端縮到最長邊 1280 px JPEG → `POST /api/extract-image`（jpeg/png/webp、≤1.5 MB、算每人 AI 額度）→ `extractPlacesFromImage`（Gemma 4 26B，抄出圖上文字當 `caption` 並用它比對亂碼）。看圖模型比較：Gemma 4 文字與欄位全對；Llama 4 Scout 文字錯很多；Mistral Small 店名錯。實測（真實 AI）約 27 秒，店名／地址／貼文文字正確
+  - YouTube：`lib/youtube.js` 用 YouTube Data API（伺服器金鑰 `GOOGLE_PLACES_KEY`）抓標題、完整說明欄、熱門 10 則留言；新增頁與 LINE 先試它，沒開通或失敗退回 og 標籤；`APIS.youtube` 記用量（每支約 2 單位／每日 10,000）。**需使用者在 Google Cloud 啟用 YouTube Data API v3 並加入伺服器金鑰的 API 限制**（`google.md` 第 2、3 步）
+  - 不做：IG／FB／Threads 留言（要登入，違反條款）、從連結下載影片分析語音或畫面（要登入或違反 YouTube 條款）
 - **整批 AI 重新分析跟著篩選（2026-10-15，本機驗證）**：清單的整批按鈕只處理「目前篩選（篩選列、搜尋、標籤）下可重新分析的店」，例如選「疑似亂碼」就只分析疑似亂碼；按鈕文字顯示範圍與家數（「沒店名」1 家、「疑似亂碼」6 家、全部 7 家；選「沒店名」時實際只送出那 1 家）
 - **資料表變動改由 GitHub Actions 自動套用（2026-10-15）**：`deploy.yml` 在測試後、部署前跑 `wrangler d1 migrations apply foodmap --remote`（失敗就不部署）。wrangler 用 `d1_migrations` 表記錄已套用檔名（含 `.sql`，本機實測）。正式資料庫之前都手動升級，**push 前要先跑一次「標記 0002～0016 已套用」指令**（在 `cloudflare.md`「自動部署」第 4 步；本機以專案實際 migrations 驗證標記後顯示 No migrations to apply）。權杖需加「帳戶／D1／編輯」（使用者 2026-10-15 已加，權杖值不變）。之後新增 `migrations/00xx_*.sql` push 即套用
 - **AI 模型可切換＋疑似亂碼偵測（2026-10-15；0016 使用者已手動跑）**：
