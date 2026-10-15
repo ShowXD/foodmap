@@ -115,7 +115,8 @@ test('links skipped over the limit are analysed later, while today\'s AI count h
   DB.sqlite.exec("UPDATE api_usage SET count = 0");
   DB.sqlite.exec("UPDATE places SET name = '手動填的' WHERE url = 'https://www.instagram.com/reel/p2/'");
   await retryPendingAi(env, 1);
-  assert.equal(aiCalls, 2);
+  // p1 once; p2's post never mentions most of the answer, so the default 'auto' choice asks a second model.
+  assert.equal(aiCalls, 3);
   assert.deepEqual(pending(), []);
   assert.deepEqual(places().filter((p) => p.line_message_id.startsWith('p')).map((p) => [p.line_message_id, p.name, p.dishes]), [
     ['p1', '江家餛飩', '炒手麵'],

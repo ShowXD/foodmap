@@ -44,6 +44,31 @@ test('AI extraction runs on the chosen model', async () => {
   assert.deepEqual(used, [QWEN]);
 });
 
+test('auto: Llama first; only a garbled or failed answer is retried with Qwen, keeping the more complete one', async () => {
+  const caption = '#江家餛飩 📍臺中市西區華美街204號 紅油炒手';
+  const answers = {
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { name: '江家予駕', address: '臺中市西區華美街204號', dishes: '紅油炒手' },
+    [QWEN]: { name: '江家餛飩', address: '臺中市西區華美街204號', dishes: '紅油炒手' },
+  };
+  const used = [];
+  const ai = (overrides = {}) => ({ run: async (model) => {
+    used.push(model.includes('qwen') ? 'qwen' : 'llama');
+    if (overrides[model] instanceof Error) throw overrides[model];
+    return { response: { places: [overrides[model] ?? answers[model]] } };
+  } });
+
+  assert.equal((await extractPlaces(ai(), caption)).places[0].name, '江家餛飩');
+  assert.deepEqual(used.splice(0), ['llama', 'qwen'], 'garbled name: retried');
+
+  const clean = { '@cf/meta/llama-3.3-70b-instruct-fp8-fast': answers[QWEN] };
+  assert.equal((await extractPlaces(ai(clean), caption)).places[0].name, '江家餛飩');
+  assert.deepEqual(used.splice(0), ['llama'], 'clean answer: one call only');
+
+  const llamaDown = { '@cf/meta/llama-3.3-70b-instruct-fp8-fast': new Error('busy') };
+  assert.equal((await extractPlaces(ai(llamaDown), caption)).places[0].name, '江家餛飩');
+  assert.deepEqual(used.splice(0), ['llama', 'qwen'], 'failed answer: retried');
+});
+
 test('extractPlaces reads both Llama-style and OpenAI-style answers', async () => {
   const json = JSON.stringify({ places: [{ name: '阿宗麵線', dishes: '', area: '', address: '', tags: '' }] });
   const llama = { run: async () => ({ response: JSON.parse(json) }) };
