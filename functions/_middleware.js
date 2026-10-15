@@ -5,8 +5,8 @@ import { LINK_COOKIE, clearLinkCookie, completeLink, linkResultCookie, readCooki
 // The LINE webhook can't log in; it authenticates with the x-line-signature header instead.
 // The privacy page is static text that must be readable before sign-in (it is linked from Google's
 // consent screen); it has its own Access bypass and inlines its styles so nothing else needs one.
-// The welcome page (where invite links land) is the same, with its script kept inside /welcome/.
-const PUBLIC_PATHS = new Set(['/api/line/webhook', '/privacy', '/privacy.html', '/welcome', '/welcome/', '/welcome/welcome.js']);
+// The welcome page (where invite links land) is the same, with its files kept inside /welcome/ (the logo copy there is also used by the Access login page).
+const PUBLIC_PATHS = new Set(['/api/line/webhook', '/privacy', '/privacy.html', '/welcome', '/welcome/', '/welcome/welcome.js', '/welcome/icon.svg']);
 // Disabled users can only see the notice page and their own status.
 const WAITING_PATHS = new Set(['/pending', '/pending.html', '/pending.js', '/api/me', '/icon.svg']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
