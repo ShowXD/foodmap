@@ -189,8 +189,10 @@ const GARBLED_LABELS = { name: '店名', address: '地址', area: '地區' };
 // Nameless, or garbled by an earlier AI run; either way the saved post text is there to try again.
 const canReanalyze = (place) => Boolean(place.caption) && (!place.name || Boolean(place.garbled?.length));
 const reanalyzeAllButton = $('reanalyze-all');
+// The batch follows the chosen chip, search and tag (e.g. only 疑似亂碼), so people pick what to spend AI on.
+const reanalyzeTargets = () => state.places.filter((place) => canReanalyze(place) && matchesFilter(place));
 reanalyzeAllButton.addEventListener('click', async () => {
-  const waiting = state.places.filter(canReanalyze);
+  const waiting = reanalyzeTargets();
   reanalyzeAllButton.disabled = true;
   let done = 0;
   let named = 0;
@@ -341,9 +343,10 @@ function renderPlaces() {
     button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
   }
   placeList.replaceChildren(...shown.map((place) => renderListItem(place, layout)));
-  const waitingForAi = state.places.filter(canReanalyze).length;
+  const waitingForAi = reanalyzeTargets().length;
   reanalyzeAllButton.hidden = !waitingForAi;
-  if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 沒店名或疑似亂碼的 ${waitingForAi} 家全部 AI 重新分析`;
+  const scope = PLACE_ISSUES[state.filter.mode]?.label ?? '沒店名或疑似亂碼';
+  if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 「${scope}」的 ${waitingForAi} 家全部 AI 重新分析`;
   if (shown.length) listMessage.textContent = '';
   else if (!state.places.length) listMessage.textContent = '還沒有收藏，按下方＋新增一家吧';
   else listMessage.textContent = searchInput.value.trim() ? '找不到符合的店' : '沒有符合篩選的店';
