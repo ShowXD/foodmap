@@ -371,6 +371,7 @@ function renderPlaces() {
   if (filter.mode === 'near') shown.sort((a, b) => distanceTo(a) - distanceTo(b));
   renderMarkers();
   refreshMapCard();
+  refreshRandomPick();
   placeList.className = layout === 'grid' ? 'place-grid' : 'place-rows';
   for (const button of document.querySelectorAll('.layout-toggle button')) {
     button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
@@ -824,6 +825,14 @@ $('random-pick').addEventListener('click', () => {
   $('random-result').replaceChildren(renderPlace(randomPick));
   $('random-on-map').hidden = !isLocated(randomPick);
 });
+
+// After ★ / 吃過 / a reload the pick is a new object; redraw it so its buttons act on current data.
+function refreshRandomPick() {
+  if (!randomPick) return;
+  randomPick = places.find((place) => place.id === randomPick.id) ?? null;
+  $('random-result').replaceChildren(...(randomPick ? [renderPlace(randomPick)] : []));
+  $('random-on-map').hidden = !randomPick || !isLocated(randomPick);
+}
 
 $('random-on-map').addEventListener('click', () => {
   if (randomPick) focusPlace(randomPick);
