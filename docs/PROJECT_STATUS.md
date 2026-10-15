@@ -203,6 +203,7 @@
   - 刻意不做：16 個檔案各自的 `json()` 一行 helper 不合併；社群頁轉址改 `redirect: 'manual'`（目前抓完會再檢查網域，風險低）；`/api/places` 回傳完整 caption（清單破百筆再改成只回 has_caption）
   - 搜尋改在前端（使用者決定「今天吃什麼」永遠從整個清單抽，要縮小範圍用標籤）：`/api/places` 一律回傳整個清單（移除 `q` 參數與 LIKE 查詢）；`app.js` `matchesSearch` 比對店名、食物、地區、地址、標籤、備註、貼文文字，只影響清單與地圖；「今天吃什麼」與標籤選單用整個清單。打字不再發請求。本機驗證：搜尋「牛肉」清單剩 1 家、吃什麼仍從 6 家抽
 - **重複店家偵測與合併（2026-10-15，本機驗證）**：Place ID 可永久保存（Google 條款），用它判斷同一清單裡的同一家店。`/api/places` GET 每筆附 `duplicates`（同清單同 `google_place_id` 的其他 id）；篩選多「重複」，卡片顯示「🔁 清單裡還有 N 筆是同一家店」與「🔗 合併重複」。`POST /api/merge-places {place_id}`（清單成員可用）：保留最早建立的一筆；店名／食物／地區／地址／標籤空白者用其他筆補；其他筆影片連結寫入備註「也出現在：…」，貼文文字以 `---` 接到 caption；每人吃過合併（評分缺則補、心得相異則接起來）、星號、縮圖（保留那筆無圖時沿用）一起搬；全部在一個 D1 batch（交易）中，刪除其他筆。`test/d1.mjs` 加上 `batch`。API 用量評估：地點搜尋每月約 500 次（免費 5,000）、座標更新每天數次，暫不需改用「只回 ID」的免費搜尋（會失去店名比對、降低自動定位準確度）
+- **AI 擷取每人每日上限 30 → 60 次（2026-10-15）**：使用者反映 30 次太少、Cloudflare 後台 neurons 還剩很多。只改 `lib/usage.js` `APIS.workers_ai.perUserDaily`；全站 140 次（以每次約 70 neurons 估）待使用者提供當日 Cloudflare neurons 用量與 App 當日 AI 次數後再校正。`npm test` 91/91
 - **AI 自動模式、截圖辨識、YouTube 完整文字（2026-10-15）**：
   - 自動模式（新預設，設定值 `auto`）：先 Llama；亂碼過濾刪掉欄位（`lost > 0`）或 Llama 失敗時改用 Qwen 再跑一次，取有效欄位（店名／食物／地區／地址）較多的結果。第二次呼叫不另計入用量（ponytail：只在亂碼時發生）
   - 截圖辨識：新增頁「📷 用截圖 AI 辨識」→ 手機端縮到最長邊 1280 px JPEG → `POST /api/extract-image`（jpeg/png/webp、≤1.5 MB、算每人 AI 額度）→ `extractPlacesFromImage`（Gemma 4 26B，抄出圖上文字當 `caption` 並用它比對亂碼）。看圖模型比較：Gemma 4 文字與欄位全對；Llama 4 Scout 文字錯很多；Mistral Small 店名錯。實測（真實 AI）約 27 秒，店名／地址／貼文文字正確

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
+import { APIS } from '../lib/usage.js';
 import { isSameAddress, isSameShop, refreshStaleLocations, searchPlaces } from '../lib/google.js';
 import * as reanalyze from '../functions/api/reanalyze.js';
 import * as places from '../functions/api/places.js';
@@ -143,7 +144,7 @@ test('AI 重新分析: fills a nameless place, locates it by address when names 
   const unplaced = await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } });
   assert.deepEqual([unplaced.status, unplaced.body.located, row(20).name, row(20).lat], [200, false, '江家餛飩', null]);
 
-  DB.sqlite.prepare("UPDATE user_daily_usage SET count = 30 WHERE user_id = ? AND api = 'workers_ai'").run(mom.id);
+  DB.sqlite.prepare("UPDATE user_daily_usage SET count = ? WHERE user_id = ? AND api = 'workers_ai'").run(APIS.workers_ai.perUserDaily, mom.id);
   DB.sqlite.exec("UPDATE places SET name = '' WHERE id = 20");
   assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } })).status, 429);
   googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });

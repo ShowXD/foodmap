@@ -149,7 +149,7 @@ npm run deploy
 
 **開放給朋友：任何 Google 帳號都能登入（2026-10-13 起採用）**
 
-朋友不用你一個個加 email，只要有 Google 帳號就能登入。每個人自動有自己的私人「我的清單」，可以自己建群組、邀朋友；費用算在你的帳上，所以 App 有每人每日上限（地圖 30 次、地點搜尋 20 次、AI 擷取 30 次，在網站管理「API 用量」看得到誰用了多少）。
+朋友不用你一個個加 email，只要有 Google 帳號就能登入。每個人自動有自己的私人「我的清單」，可以自己建群組、邀朋友；費用算在你的帳上，所以 App 有每人每日上限（地圖 30 次、地點搜尋 20 次、AI 擷取 60 次，在網站管理「API 用量」看得到誰用了多少）。
 
 1. **Access 控制** → **原則** → 編輯 `foodmap 家人`：
    - 在包含（Include）**新增一條**：**登入方法（Login Methods）** = **Google**。
@@ -269,7 +269,7 @@ curl -si -X POST https://<專案>.pages.dev/api/line/webhook | head -5
   - `X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: same-origin`。
   - `/api/*` 另外加上 `Cache-Control: no-store`。
   - 之後接 Google 地圖時，要在 CSP 加上 Google 的網域。
-- AI 擷取每人每天上限 30 次，記在 `user_daily_usage` 表，避免一個帳號用光全家的免費額度。抓貼文時若被轉址到非 IG/FB 網域就不讀，最多只讀 512 KB。
+- AI 擷取每人每天上限 60 次，記在 `user_daily_usage` 表，避免一個帳號用光全家的免費額度。抓貼文時若被轉址到非 IG/FB 網域就不讀，最多只讀 512 KB。
 - 店家欄位有長度上限：一般欄位 500 字、備註 2000 字、貼文文字 5000 字、網址 2048 字、搜尋字串 100 字。
 - 清單權限在 `lib/lists.js`：
   - 個人清單只有本人能用，**網站管理員也看不到**。
