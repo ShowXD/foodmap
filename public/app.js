@@ -169,7 +169,36 @@ function renderPlace(place) {
   const merge = card.querySelector('.merge');
   merge.hidden = !place.duplicates?.length;
   merge.addEventListener('click', () => mergeDuplicates(place, merge));
+  showGoogleRating(card, place);
+  card.querySelector('.rating-lookup').addEventListener('click', (event) => lookUpRating(card, place, event.currentTarget));
   return card;
+}
+
+// Looked up only when asked (each lookup counts against a small free quota) and kept only while the page
+// is open: Google's terms don't allow saving it.
+const googleRatings = new Map();
+
+function showGoogleRating(card, place) {
+  const known = googleRatings.get(place.id);
+  card.querySelector('.rating-lookup').hidden = !place.google_place_id || Boolean(known);
+  card.querySelector('.google-rating').hidden = !known;
+  if (!known) return;
+  const link = card.querySelector('.google-rating a');
+  link.textContent = known.rating ? `Google 地圖 ★${known.rating}（${known.count.toLocaleString()} 則評論）` : 'Google 地圖上還沒有評分';
+  link.href = mapsUrl(place);
+}
+
+async function lookUpRating(card, place, button) {
+  button.disabled = true;
+  button.textContent = '查詢中…';
+  try {
+    googleRatings.set(place.id, await api('GET', null, `?place_id=${place.id}`, '/api/place-rating'));
+    showGoogleRating(card, place);
+  } catch (error) {
+    alert(error.message);
+    button.disabled = false;
+    button.textContent = '⭐ Google 評分';
+  }
 }
 
 // The server fills it from its saved post text, adds the post's other shops, and locates them.

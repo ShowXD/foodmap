@@ -11,9 +11,9 @@
 | 顯示地圖 | Maps JavaScript API | Dynamic Maps | 10,000 次 | US$7 |
 | 用店名找位置 | Places API (New) Text Search（只要 ID、名稱、地址、座標） | Text Search Pro | 5,000 次 | US$32 |
 | 每 25 天更新一次座標 | Places API (New) Place Details（只要座標） | Place Details Essentials | 10,000 次 | US$5 |
-| 營業時間、Google 評分 | Places API (New) Place Details | Place Details Enterprise | **1,000 次** | US$20 |
+| Google 評分（卡片上按「⭐ Google 評分」才查） | Places API (New) Place Details（只要評分與評論數） | Place Details Enterprise | **1,000 次** | US$20 |
 
-一家人的用量（一個月幾百次開地圖、新增幾十到一百家店）**全部在免費額度內**。最需要注意的是營業時間和評分，因為每月只有 1,000 次免費。程式只會在你**打開店家卡片時**才查詢，並設每日上限。免費額度是同一個帳單帳戶下所有專案合計。
+一家人的用量（一個月幾百次開地圖、新增幾十到一百家店）**全部在免費額度內**。最需要注意的是評分，因為每月只有 1,000 次免費。程式只在有人按卡片上的「⭐ Google 評分」時才查，結果不儲存，並限制全站每天 30 次、每人每天 10 次。免費額度是同一個帳單帳戶下所有專案合計。
 
 ### 為什麼不把營業時間存起來
 
@@ -72,6 +72,8 @@ Google 條款規定：
 **IAM 與管理** → **配額與系統限制**，用服務篩選：
 - **Places API (New)**：把 `SearchText`、`GetPlace` 的每分鐘請求數調低，例如每分鐘 10 次。若有「每日」的項目，也設一個上限，例如每天 100 次。
 - **Maps JavaScript API**：若有每日地圖載入的上限項目，設成例如每天 300 次。
+
+> `GetPlace` 同時用在「座標更新」（程式每天最多 30 次）與「Google 評分」（每天最多 30 次），所以 `GetPlace` 的每日上限請至少設 60 次。
 
 > 網站管理頁的「API 用量」會用這些數字算「今日剩幾次」。之後若改了配額，也要一起改 `lib/usage.js` 裡的 `dailyLimit`。
 

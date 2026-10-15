@@ -8,6 +8,7 @@ import * as reanalyze from '../functions/api/reanalyze.js';
 import * as places from '../functions/api/places.js';
 import * as placeSearch from '../functions/api/place-search.js';
 import * as placeLocation from '../functions/api/place-location.js';
+import * as placeRating from '../functions/api/place-rating.js';
 import { onRequestPost as lineWebhook } from '../functions/api/line/webhook.js';
 
 const KEY = 'test-places-key';
@@ -119,6 +120,25 @@ test('isSameAddress compares street and door number, ignoring 臺/台, spaces, f
   assert.equal(isSameAddress('臺中市西區華美街204號', '403台灣臺中市西區華美街206號'), false);
   assert.equal(isSameAddress('臺中市西區', '403台灣臺中市西區華美街204號'), false, 'no street number: not enough to trust');
   assert.equal(isSameAddress('', '403台灣臺中市西區華美街204號'), false);
+});
+
+test('Google rating: on request only, members only, never stored, within each person\'s daily share', async () => {
+  const { DB, mom, stranger, call, row } = await setup();
+  const get = (as, id = 10) => call(placeRating.onRequestGet, as, { method: 'GET', query: `?place_id=${id}` });
+  assert.equal((await get(stranger)).status, 404);
+  assert.equal((await get(mom)).status, 409, 'not located with Google yet');
+
+  DB.sqlite.exec(`UPDATE places SET google_place_id = '${GOOGLE_ID}' WHERE id = 10`);
+  googleReply = () => Response.json({ rating: 4.2, userRatingCount: 1234 });
+  sent.length = 0;
+  const rated = await get(mom);
+  assert.deepEqual([rated.status, rated.body], [200, { rating: 4.2, count: 1234 }]);
+  assert.equal(sent[0].init.headers['X-Goog-FieldMask'], 'rating,userRatingCount');
+  assert.ok(!Object.values(row()).includes(4.2), 'nothing from Google is written to the place');
+
+  DB.sqlite.prepare("UPDATE user_daily_usage SET count = ? WHERE user_id = ? AND api = 'place_rating'").run(APIS.place_rating.perUserDaily, mom.id);
+  assert.equal((await get(mom)).status, 429);
+  googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
 });
 
 test('a shop located onto one already in the list merges into it, by AI or by picking it', async () => {
