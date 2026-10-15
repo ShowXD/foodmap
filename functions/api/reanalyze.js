@@ -23,6 +23,7 @@ export async function onRequestPost({ request, env, data }) {
   if (error === 'unavailable') return json({ error: 'AI 暫時無法使用（可能已達今日免費額度），明天再試' }, 502);
   if (error === 'unusable') return json({ error: 'AI 回傳格式錯誤，請再試一次或手動填寫' }, 502);
   if (places.length === 0) return json({ error: 'AI 在貼文裡找不到店家，請手動填寫' }, 422);
-  await fillFromAi(env, place, places);
-  return json({ shops: places.length });
+  const { located } = await fillFromAi(env, place, places);
+  // located false: it has a name now but Google gave no sure match, so the app asks the person to pick.
+  return json({ shops: places.length, located });
 }

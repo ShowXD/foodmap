@@ -172,8 +172,11 @@ async function reanalyzePlace(place, button) {
   button.disabled = true;
   button.textContent = 'AI 分析中…';
   try {
-    await api('POST', { place_id: place.id }, '', '/api/reanalyze');
+    const { located } = await api('POST', { place_id: place.id }, '', '/api/reanalyze');
     await loadPlaces();
+    // Named now but not on the map yet, so it would stay in 待整理: let the person pick the right shop.
+    const updated = state.places.find((candidate) => candidate.id === place.id);
+    if (!located && updated) openLocateDialog(updated);
   } catch (error) {
     alert(error.message);
     button.disabled = false;
@@ -187,21 +190,32 @@ reanalyzeAllButton.addEventListener('click', async () => {
   const waiting = state.places.filter(canReanalyze);
   reanalyzeAllButton.disabled = true;
   let done = 0;
+  let named = 0;
+  let notLocated = 0;
+  let stopped = null;
   try {
     // One at a time: each is a few seconds of AI, and a quota error should stop the rest.
     for (const place of waiting) {
       reanalyzeAllButton.textContent = `AI 分析中 ${done + 1}/${waiting.length}…`;
-      await api('POST', { place_id: place.id }, '', '/api/reanalyze').catch((error) => {
+      const result = await api('POST', { place_id: place.id }, '', '/api/reanalyze').catch((error) => {
         if (error.status !== 422 && error.status !== 409) throw error; // nothing found / named meanwhile: skip it
+        return null;
       });
       done++;
+      if (result) named++;
+      if (result && !result.located) notLocated++;
     }
   } catch (error) {
-    alert(`分析了 ${done} 家後停止：${error.message}`);
+    stopped = error;
   } finally {
     reanalyzeAllButton.disabled = false;
     await loadPlaces();
   }
+  const summary = [
+    stopped ? `分析了 ${done} 家後停止（${stopped.message}）` : `分析完成，${named} 家補上店名`,
+    notLocated && `其中 ${notLocated} 家沒能自動定位，還留在「待整理」，請點開按「📍 定位」選擇正確的店`,
+  ].filter(Boolean).join('；');
+  alert(summary);
 });
 
 async function toggleStar(place, button) {

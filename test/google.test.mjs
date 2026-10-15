@@ -130,11 +130,18 @@ test('AI 重新分析: fills a nameless place, locates it by address when names 
 
   assert.equal((await call(reanalyze.onRequestPost, stranger, { body: { place_id: 20 } })).status, 404);
   assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 21 } })).status, 422, 'no post text saved');
-  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } })).status, 200);
+  const analysed = await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } });
+  assert.deepEqual([analysed.status, analysed.body.located], [200, true]);
   assert.deepEqual([row(20).name, row(20).google_place_id, row(20).ai_pending], ['江家餛飩', GOOGLE_ID, 0]);
   const second = DB.sqlite.prepare("SELECT name, source, created_by FROM places WHERE url = 'https://fb.watch/b' AND id <> 20").get();
   assert.deepEqual({ ...second }, { name: '阿宗麵線', source: 'line', created_by: null });
   assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } })).status, 409, 'already named');
+
+  // Google's top hit is some other shop: the name is filled in, but the app is told it still needs placing.
+  DB.sqlite.exec("UPDATE places SET name = '', lat = NULL, lng = NULL, google_place_id = NULL WHERE id = 20");
+  googleReply = () => Response.json({ places: [{ ...googleHit('得正 飲料'), formattedAddress: '台中市西區公益路1號' }] });
+  const unplaced = await call(reanalyze.onRequestPost, mom, { body: { place_id: 20 } });
+  assert.deepEqual([unplaced.status, unplaced.body.located, row(20).name, row(20).lat], [200, false, '江家餛飩', null]);
 
   DB.sqlite.prepare("UPDATE user_daily_usage SET count = 30 WHERE user_id = ? AND api = 'workers_ai'").run(mom.id);
   DB.sqlite.exec("UPDATE places SET name = '' WHERE id = 20");
