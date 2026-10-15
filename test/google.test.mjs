@@ -121,6 +121,27 @@ test('isSameAddress compares street and door number, ignoring 臺/台, spaces, f
   assert.equal(isSameAddress('', '403台灣臺中市西區華美街204號'), false);
 });
 
+test('a shop located onto one already in the list merges into it, by AI or by picking it', async () => {
+  const { DB, env, mom, call, row } = await setup();
+  DB.sqlite.exec(`UPDATE places SET google_place_id = '${GOOGLE_ID}', lat = 22.99, lng = 120.2, created_at = '2026-10-01 00:00:00' WHERE id = 10;
+    INSERT INTO places (id, list_id, url, caption, created_at) VALUES
+      (30, 1, 'https://fb.watch/again', '阿宗麵線 大腸超多', '2026-10-05 00:00:00'),
+      (31, 1, 'https://fb.watch/third', '', '2026-10-06 00:00:00');
+    INSERT INTO place_stars (user_id, place_id) VALUES (${mom.id}, 30);`);
+  env.AI = { run: async () => ({ response: { places: [{ name: '阿宗麵線', dishes: '大腸' }] } }) };
+  googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
+
+  const analysed = await call(reanalyze.onRequestPost, mom, { body: { place_id: 30 } });
+  assert.deepEqual([analysed.status, analysed.body.located], [200, true]);
+  assert.equal(DB.sqlite.prepare('SELECT COUNT(*) AS n FROM places WHERE id = 30').get().n, 0);
+  assert.deepEqual([row().dishes, row().note], ['大腸', '也出現在：https://fb.watch/again']);
+  assert.equal(DB.sqlite.prepare('SELECT COUNT(*) AS n FROM place_stars WHERE place_id = 10').get().n, 1);
+
+  const picked = await call(placeLocation.onRequestPut, mom, { method: 'PUT', body: { place_id: 31, lat: 22.99, lng: 120.2, google_place_id: GOOGLE_ID } });
+  assert.deepEqual(picked.body, { ok: true, kept_id: 10 });
+  assert.equal(DB.sqlite.prepare('SELECT COUNT(*) AS n FROM places WHERE list_id = 1').get().n, 1);
+});
+
 test('AI 重新分析: fills a nameless place, locates it by address when names differ, and counts the person\'s AI quota', async () => {
   const { DB, env, mom, stranger, call, row } = await setup();
   DB.sqlite.exec(`INSERT INTO places (id, list_id, url, caption, source, ai_pending) VALUES

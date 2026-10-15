@@ -335,10 +335,10 @@ async function chooseLocation(place, candidate) {
   locateMessage.textContent = '儲存中…';
   try {
     const { google_place_id, lat, lng } = candidate;
-    await api('PUT', { place_id: place.id, google_place_id, lat, lng }, '', '/api/place-location');
+    const { kept_id: keptId } = await api('PUT', { place_id: place.id, google_place_id, lat, lng }, '', '/api/place-location');
     locateDialog.close('cancel');
     await page.reloadPlaces();
-    const updated = state.places.find((candidateRow) => candidateRow.id === place.id);
+    const updated = state.places.find((candidateRow) => candidateRow.id === keptId);
     if (updated) page.focusPlace(updated);
   } catch (error) {
     locateMessage.textContent = `儲存失敗：${error.message}`;

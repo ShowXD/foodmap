@@ -1,5 +1,6 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
 import { clearLocation, saveLocation } from '../../lib/google.js';
+import { mergeSamePlace } from '../../lib/merge.js';
 
 const GOOGLE_PLACE_ID = /^[\w-]{10,300}$/;
 const json = (body, status = 200) => Response.json(body, { status });
@@ -19,7 +20,9 @@ export async function onRequestPut({ request, env, data }) {
   if (googlePlaceId !== null && !GOOGLE_PLACE_ID.test(googlePlaceId)) return json({ error: 'invalid google_place_id' }, 400);
 
   await saveLocation(env.DB, place.id, { lat: body.lat, lng: body.lng, google_place_id: googlePlaceId });
-  return json({ ok: true });
+  // Picked a shop already in this list: merge, and tell the app which place is left to show.
+  const merged = googlePlaceId ? await mergeSamePlace(env.DB, place.id) : null;
+  return json({ ok: true, kept_id: merged?.kept_id ?? place.id });
 }
 
 export async function onRequestDelete({ request, env, data }) {

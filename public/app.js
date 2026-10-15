@@ -223,7 +223,8 @@ reanalyzeAllButton.addEventListener('click', async () => {
     for (const place of waiting) {
       reanalyzeAllButton.textContent = `AI 分析中 ${done + 1}/${waiting.length}…`;
       const result = await api('POST', { place_id: place.id }, '', '/api/reanalyze').catch((error) => {
-        if (error.status !== 422 && error.status !== 409) throw error; // nothing found / named meanwhile: skip it
+        // Nothing found, named meanwhile, or merged into an earlier one of the batch: skip it.
+        if (![404, 409, 422].includes(error.status)) throw error;
         return null;
       });
       done++;
