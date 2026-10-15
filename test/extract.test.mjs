@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
 import { parsePlaces, groundPlaces } from '../lib/ai.js';
-import { isSocialUrl, parseOgText } from '../lib/social.js';
+import { fetchSocialPage, isSocialUrl, parseOgText } from '../lib/social.js';
 import { ensureUser } from '../lib/users.js';
 import { createTestDb } from './d1.mjs';
 
@@ -22,6 +22,29 @@ test('isSocialUrl only allows IG/FB/Threads/YouTube hosts', () => {
   assert.ok(!isSocialUrl('https://evilinstagram.com/'));
   assert.ok(!isSocialUrl('http://169.254.169.254/latest'));
   assert.ok(!isSocialUrl('javascript:alert(1)'));
+});
+
+test('fetchSocialPage follows redirects between social hosts but never requests any other host', async () => {
+  const realFetch = globalThis.fetch;
+  const requested = [];
+  const redirects = {
+    'https://fb.watch/abc': 'https://www.facebook.com/reel/1',
+    'https://www.facebook.com/share/r/x': 'https://l.facebook.com/l.php?u=evil',
+    'https://l.facebook.com/l.php?u=evil': 'https://evil.example/steal',
+  };
+  globalThis.fetch = async (url, init) => {
+    requested.push(url);
+    assert.equal(init.redirect, 'manual');
+    if (redirects[url]) return new Response(null, { status: 302, headers: { Location: redirects[url] } });
+    return new Response('<meta property="og:title" content="阿宗麵線">');
+  };
+  try {
+    assert.match(await fetchSocialPage('https://fb.watch/abc'), /阿宗麵線/);
+    assert.equal(await fetchSocialPage('https://www.facebook.com/share/r/x'), '');
+    assert.ok(!requested.some((url) => url.startsWith('https://evil.example')), requested.join(' '));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('parseOgText reads both attribute orders and decodes entities', () => {
