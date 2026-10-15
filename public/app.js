@@ -336,7 +336,15 @@ function chip(label, isActive, onClick) {
   return button;
 }
 
+const SEARCH_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'note', 'caption'];
+// The search box narrows the list and the map only; 今天吃什麼 and the tag menus always use the whole list.
+function matchesSearch(place) {
+  const query = searchInput.value.trim().toLowerCase();
+  return !query || SEARCH_FIELDS.some((field) => String(place[field] ?? '').toLowerCase().includes(query));
+}
+
 function matchesFilter(place) {
+  if (!matchesSearch(place)) return false;
   if (filter.mode === 'todo' && place.my_visited_at) return false;
   if (filter.mode === 'visited' && !place.my_visited_at) return false;
   if (filter.mode === 'starred' && !place.starred) return false;
@@ -382,22 +390,20 @@ function renderPlaces() {
   const waitingForAi = places.filter(canReanalyze).length;
   reanalyzeAllButton.hidden = !waitingForAi;
   if (!reanalyzeAllButton.disabled) reanalyzeAllButton.textContent = `✨ 待整理的 ${waitingForAi} 家全部 AI 重新分析`;
-  const query = searchInput.value.trim();
   if (shown.length) listMessage.textContent = '';
-  else if (places.length) listMessage.textContent = '沒有符合篩選的店';
-  else listMessage.textContent = query ? '找不到符合的店' : '還沒有收藏，按下方＋新增一家吧';
+  else if (!places.length) listMessage.textContent = '還沒有收藏，按下方＋新增一家吧';
+  else listMessage.textContent = searchInput.value.trim() ? '找不到符合的店' : '沒有符合篩選的店';
 }
 
 let placesLoad = 0;
 async function loadPlaces({ markRead = false } = {}) {
   if (!currentListId) return;
-  const query = searchInput.value.trim();
-  // Switching lists or typing while a load is in flight: only the newest answer may be drawn,
+  // Switching lists while a load is in flight: only the newest answer may be drawn,
   // or an older list's shops would show (and be edited) under the newly chosen list.
   const thisLoad = ++placesLoad;
   listMessage.textContent = '載入中…';
   try {
-    const loaded = await api('GET', null, `?list=${currentListId}${query ? `&q=${encodeURIComponent(query)}` : ''}`);
+    const loaded = await api('GET', null, `?list=${currentListId}`);
     if (thisLoad !== placesLoad) return;
     places = loaded;
     renderPlaces();
@@ -416,11 +422,7 @@ for (const button of document.querySelectorAll('.layout-toggle button')) {
   });
 }
 
-let searchTimer;
-searchInput.addEventListener('input', () => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(loadPlaces, 300);
-});
+searchInput.addEventListener('input', renderPlaces);
 
 // ---- Map ----
 const mapCard = $('map-card');

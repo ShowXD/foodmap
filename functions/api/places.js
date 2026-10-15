@@ -3,14 +3,12 @@ import { expireGoogleLocations, refreshStaleLocations } from '../../lib/google.j
 import { retryPendingAi } from './line/webhook.js';
 
 const EDITABLE_FIELDS =['caption', 'name', 'dishes', 'area', 'address', 'tags', 'note', 'status'];
-const SEARCH_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'note', 'caption'];
 const SOURCES = ['line', 'share', 'manual'];
 const STATUSES = ['todo', 'visited'];
 // Caps keep one row (and the LIKE search) small; captions mirror the AI extraction limit.
 const MAX_FIELD_LENGTH = { caption: 5000, note: 2000 };
 const DEFAULT_MAX_FIELD_LENGTH = 500;
 const MAX_URL_LENGTH = 2048;
-const MAX_QUERY_LENGTH = 100;
 
 const json = (body, status = 200) => Response.json(body, { status });
 
@@ -57,10 +55,7 @@ export async function onRequestGet({ request, env, data, waitUntil }) {
   if (env.GOOGLE_PLACES_KEY) waitUntil(refreshStaleLocations(env.DB, env.GOOGLE_PLACES_KEY, list.id));
   if (env.AI) waitUntil(retryPendingAi(env, list.id).catch((error) => console.error('AI retry failed', error.message)));
 
-  const query = params.get('q')?.trim().slice(0, MAX_QUERY_LENGTH);
-  // ponytail: LIKE full scan per list, fine for hundreds of rows; switch to FTS5 if it gets slow
-  const search = query ? `AND (${SEARCH_FIELDS.map((f) => `p.${f} LIKE ?2`).join(' OR ')})` : '';
-  // Personal marks ride along so one request draws the whole list. "新" = added by someone
+  // The whole list every time: the app searches it on the phone. Personal marks ride along so one request draws the whole list. "新" = added by someone
   // else after this user last opened the list (never on the very first visit).
   const { results } = await env.DB
     .prepare(
@@ -69,15 +64,15 @@ export async function onRequestGet({ request, env, data, waitUntil }) {
               (SELECT COUNT(*) FROM place_visits v WHERE v.place_id = p.id) AS visit_count,
               (SELECT ROUND(AVG(v.rating), 1) FROM place_visits v WHERE v.place_id = p.id AND v.rating IS NOT NULL) AS avg_rating,
               CASE WHEN s.user_id IS NULL THEN 0 ELSE 1 END AS starred,
-              CASE WHEN r.read_at IS NOT NULL AND p.created_at > r.read_at AND COALESCE(p.created_by, 0) <> ?3 THEN 1 ELSE 0 END AS is_new
+              CASE WHEN r.read_at IS NOT NULL AND p.created_at > r.read_at AND COALESCE(p.created_by, 0) <> ?2 THEN 1 ELSE 0 END AS is_new
        FROM places p
-       LEFT JOIN place_visits mv ON mv.place_id = p.id AND mv.user_id = ?3
-       LEFT JOIN place_stars s ON s.place_id = p.id AND s.user_id = ?3
-       LEFT JOIN list_reads r ON r.list_id = p.list_id AND r.user_id = ?3
-       WHERE p.list_id = ?1 ${search}
+       LEFT JOIN place_visits mv ON mv.place_id = p.id AND mv.user_id = ?2
+       LEFT JOIN place_stars s ON s.place_id = p.id AND s.user_id = ?2
+       LEFT JOIN list_reads r ON r.list_id = p.list_id AND r.user_id = ?2
+       WHERE p.list_id = ?1
        ORDER BY p.created_at DESC, p.id DESC`,
     )
-    .bind(list.id, query ? `%${query}%` : '', data.user.id)
+    .bind(list.id, data.user.id)
     .all();
   return json(results);
 }
