@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
-import { DEFAULT_AI_MODEL, extractPlaces } from '../lib/ai.js';
+import { DEFAULT_AI_MODEL, extractPlaces, extractPlacesFromImage } from '../lib/ai.js';
 import * as settings from '../functions/api/settings.js';
 import * as extract from '../functions/api/extract.js';
+import * as extractImage from '../functions/api/extract-image.js';
 
 const QWEN = '@cf/qwen/qwen3-30b-a3b-fp8';
 
@@ -67,6 +68,37 @@ test('auto: Llama first; only a garbled or failed answer is retried with Qwen, k
   const llamaDown = { '@cf/meta/llama-3.3-70b-instruct-fp8-fast': new Error('busy') };
   assert.equal((await extractPlaces(ai(llamaDown), caption)).places[0].name, '江家餛飩');
   assert.deepEqual(used.splice(0), ['llama', 'qwen'], 'failed answer: retried');
+});
+
+test('screenshots: the copied text becomes the caption and the shops are checked against it', async () => {
+  const sent = [];
+  const ai = { run: async (model, input) => {
+    sent.push([model, input.messages[1].content[1].image_url.url.slice(0, 24)]);
+    return { choices: [{ message: { content: JSON.stringify({
+      text: '江家餛飩\n臺中市西區華美街204號',
+      places: [{ name: '江家餛飩', address: '臺中市西區華美街204號', dishes: '', area: '', tags: '' }, { name: '亂寫的店', address: '', dishes: '', area: '', tags: '' }],
+    }) } }] };
+  } };
+  const result = await extractPlacesFromImage(ai, new Uint8Array([0xff, 0xd8, 0xff]), 'image/jpeg');
+  assert.equal(result.caption, '江家餛飩\n臺中市西區華美街204號');
+  assert.deepEqual(result.places.map((place) => place.name), ['江家餛飩'], 'a name the image never shows is dropped');
+  assert.deepEqual(sent, [['@cf/google/gemma-4-26b-a4b-it', 'data:image/jpeg;base64,/']]);
+});
+
+test('/api/extract-image takes small images only and counts against the daily AI allowance', async () => {
+  const DB = createTestDb();
+  const kid = await ensureUser(DB, 'kid@example.test', {});
+  const AI = { run: async () => ({ response: { text: '阿宗麵線', places: [{ name: '阿宗麵線', address: '', dishes: '', area: '', tags: '' }] } }) };
+  const post = (body, type) => extractImage.onRequestPost({
+    request: new Request('https://example.test/api/extract-image', { method: 'POST', body, headers: { 'Content-Type': type } }),
+    env: { DB, AI }, data: { user: kid },
+  });
+  assert.equal((await post('<svg/>', 'image/svg+xml')).status, 415);
+  assert.equal((await post(new Uint8Array(0), 'image/jpeg')).status, 400);
+  assert.equal((await post(new Uint8Array(2 * 1024 * 1024), 'image/jpeg')).status, 413);
+  const ok = await post(new Uint8Array([0xff, 0xd8, 0xff]), 'image/jpeg');
+  assert.deepEqual([ok.status, (await ok.json()).caption], [200, '阿宗麵線']);
+  assert.equal(DB.sqlite.prepare("SELECT count FROM user_daily_usage WHERE api = 'workers_ai'").get().count, 1);
 });
 
 test('extractPlaces reads both Llama-style and OpenAI-style answers', async () => {

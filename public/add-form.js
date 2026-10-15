@@ -122,20 +122,65 @@ aiFillButton.addEventListener('click', async () => {
   try {
     const extracted = await api('POST', { url: url.value, caption: caption.value }, '', '/api/extract');
     caption.value = extracted.caption;
-    const isEditing = Boolean(addForm.elements.id.value);
-    if (extracted.places.length === 1 || isEditing) {
-      hideCandidates();
-      fillFromAi(extracted.places[0]);
-      formMessage.textContent = 'AI 已填入，請確認後再儲存';
-    } else {
-      showCandidates(extracted.places);
-      formMessage.textContent = `AI 找到 ${extracted.places.length} 家店，勾選要存的再按「儲存勾選的店家」`;
-    }
+    applyExtracted(extracted.places);
   } catch (error) {
     formMessage.textContent = error.message;
     if (error.status === 422) caption.focus();
   } finally {
     aiFillButton.disabled = false;
+  }
+});
+
+// One shop fills the form (editing always does); several are offered to tick.
+function applyExtracted(places) {
+  const isEditing = Boolean(addForm.elements.id.value);
+  if (places.length === 1 || isEditing) {
+    hideCandidates();
+    fillFromAi(places[0]);
+    formMessage.textContent = 'AI 已填入，請確認後再儲存';
+  } else {
+    showCandidates(places);
+    formMessage.textContent = `AI 找到 ${places.length} 家店，勾選要存的再按「儲存勾選的店家」`;
+  }
+}
+
+// ---- Reading a screenshot ----
+const aiImageButton = $('ai-image');
+const aiImageFile = $('ai-image-file');
+const MAX_IMAGE_SIDE = 1280;
+
+// Phone screenshots are several MB; text stays readable at 1280 px, and the upload stays small.
+async function shrinkImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('無法處理這張圖片'))), 'image/jpeg', 0.85);
+  });
+}
+
+aiImageButton.addEventListener('click', () => aiImageFile.click());
+aiImageFile.addEventListener('change', async () => {
+  const file = aiImageFile.files[0];
+  aiImageFile.value = '';
+  if (!file) return;
+  aiImageButton.disabled = true;
+  formMessage.textContent = 'AI 正在看截圖，約 20 秒…';
+  try {
+    const response = await fetch('/api/extract-image', { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: await shrinkImage(file) });
+    const extracted = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(extracted.error || `HTTP ${response.status}`);
+    // The screenshot's text becomes (or joins) the post text, so it can be checked and re-analysed later.
+    const { caption } = addForm.elements;
+    caption.value = [caption.value.trim(), extracted.caption].filter(Boolean).join('\n');
+    applyExtracted(extracted.places);
+  } catch (error) {
+    formMessage.textContent = error.message;
+  } finally {
+    aiImageButton.disabled = false;
   }
 });
 
