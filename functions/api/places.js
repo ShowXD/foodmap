@@ -68,7 +68,16 @@ export async function onRequestGet({ request, env, data, waitUntil }) {
     .bind(list.id, data.user.id)
     .all();
   // garbled: fields whose wording the post never uses, shown as 疑似亂碼 and offered for AI re-analysis.
-  return json(results.map((place) => ({ ...place, garbled: garbledFields(place) })));
+  // duplicates: other places here with the same Google place ID (the same shop posted again), to merge.
+  const idsByGooglePlace = new Map();
+  for (const { id, google_place_id: googlePlaceId } of results) {
+    if (googlePlaceId) idsByGooglePlace.set(googlePlaceId, [...(idsByGooglePlace.get(googlePlaceId) ?? []), id]);
+  }
+  return json(results.map((place) => ({
+    ...place,
+    garbled: garbledFields(place),
+    duplicates: (idsByGooglePlace.get(place.google_place_id) ?? []).filter((id) => id !== place.id),
+  })));
 }
 
 export async function onRequestPost({ request, env, data }) {

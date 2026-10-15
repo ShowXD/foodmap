@@ -136,6 +136,7 @@ function renderPlace(place) {
     place.tags,
     place.source === 'line' && '來自 LINE',
     place.garbled?.length && `⚠️ 疑似亂碼：${place.garbled.map((field) => GARBLED_LABELS[field]).join('、')}`,
+    place.duplicates?.length && `🔁 清單裡還有 ${place.duplicates.length} 筆是同一家店`,
   ].filter(Boolean).join(' · ');
   card.querySelector('.family').textContent = familySummary(place);
   card.querySelector('.note').textContent = [place.note, place.my_note && `我的心得：${place.my_note}`].filter(Boolean).join('\n');
@@ -165,6 +166,9 @@ function renderPlace(place) {
   // LINE links saved after the day's AI limit keep their post text but no shop details.
   reanalyze.hidden = !canReanalyze(place);
   reanalyze.addEventListener('click', () => reanalyzePlace(place, reanalyze));
+  const merge = card.querySelector('.merge');
+  merge.hidden = !place.duplicates?.length;
+  merge.addEventListener('click', () => mergeDuplicates(place, merge));
   return card;
 }
 
@@ -187,6 +191,22 @@ async function reanalyzePlace(place, button) {
 
 const GARBLED_LABELS = { name: '店名', address: '地址', area: '地區' };
 // Nameless, or garbled by an earlier AI run; either way the saved post text is there to try again.
+// The same shop posted more than once in this list: keep the oldest, fold the rest (and everyone's marks) in.
+async function mergeDuplicates(place, button) {
+  const count = place.duplicates.length + 1;
+  if (!confirm(`把這 ${count} 筆同一家店合併成一筆？\n會保留最早存的那筆，空白欄位用其他筆補上，其他影片連結寫進備註；大家的吃過、評分、心得、星號都會合併。`)) return;
+  button.disabled = true;
+  try {
+    const { kept_id: keptId } = await api('POST', { place_id: place.id }, '', '/api/merge-places');
+    await loadPlaces();
+    const kept = state.places.find((candidate) => candidate.id === keptId);
+    if (kept) showMapCard(kept);
+  } catch (error) {
+    alert(`合併失敗：${error.message}`);
+    button.disabled = false;
+  }
+}
+
 const canReanalyze = (place) => Boolean(place.caption) && (!place.name || Boolean(place.garbled?.length));
 const reanalyzeAllButton = $('reanalyze-all');
 // The batch follows the chosen chip, search and tag (e.g. only 疑似亂碼), so people pick what to spend AI on.

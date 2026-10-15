@@ -10,6 +10,19 @@ export function createTestDb() {
   sqlite.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'));
   return {
     sqlite,
+    // Like D1: all statements in one transaction, rolled back together if any fails.
+    async batch(statements) {
+      sqlite.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.all());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
+    },
     prepare(sql) {
       const statement = sqlite.prepare(sql);
       let args = [];

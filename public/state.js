@@ -38,6 +38,7 @@ export const PLACE_ISSUES = {
   'no-name': { label: '沒店名', test: (place) => !place.name },
   'no-location': { label: '沒定位', test: (place) => Boolean(place.name) && !isLocated(place) },
   garbled: { label: '疑似亂碼', test: (place) => Boolean(place.garbled?.length) },
+  duplicate: { label: '重複', test: (place) => Boolean(place.duplicates?.length) },
 };
 export const tagsOf = (place) => String(place.tags ?? '').split(/\s+/).filter(Boolean);
 
