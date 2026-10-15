@@ -52,7 +52,7 @@
       </div>
       <div id="filter-chips" class="chips" role="group" aria-label="篩選"></div>
       <button id="reanalyze-all" type="button" class="secondary" hidden></button>
-      <p id="list-message" role="status"></p>
+      <output id="list-message"></output>
       <ul id="place-list" class="place-rows"></ul>
     </section>
 
@@ -77,7 +77,7 @@
         <label>備註 <textarea name="note" rows="2"></textarea></label>
         <button type="submit">儲存</button>
         <button id="cancel-edit" type="button" class="secondary" hidden>取消編輯</button>
-        <p id="form-message" role="status"></p>
+        <output id="form-message"></output>
       </form>
     </section>
 
@@ -95,7 +95,7 @@
       <label>標籤 <select id="random-tag"><option value="">全部</option></select></label>
       <label class="checkbox-label"><input id="random-include-visited" type="checkbox"> 也抽我吃過的店</label>
       <button id="random-pick" type="button" class="random-big">🎲 抽一家</button>
-      <p id="random-message" class="meta" role="status"></p>
+      <output id="random-message" class="meta"></output>
       <ul id="random-result" class="place-list"></ul>
       <button id="random-on-map" type="button" class="secondary" hidden>在地圖上看</button>
     </section>
@@ -104,7 +104,7 @@
       <div class="profile">
         <button id="avatar-button" type="button" class="avatar avatar-large" aria-label="更換大頭貼"></button>
         <div class="profile-text">
-          <h2 id="profile-name" class="profile-name"></h2>
+          <h2 id="profile-name" class="profile-name">我的</h2>
           <p id="user-email" class="meta"></p>
         </div>
         <button id="edit-profile" type="button" class="secondary edit-profile">編輯</button>
@@ -136,7 +136,7 @@
         <label class="checkbox-label"><input id="pin-show-name" type="checkbox"> 在圖釘上顯示店名</label>
         <p class="meta">顏色：橘＝還沒吃、灰＝我吃過、金＝想吃。設定只套用在這支手機。</p>
       </section>
-      <nav class="menu">
+      <nav class="menu" aria-label="更多功能">
         <a class="admin-only" href="#usage" hidden>📊 API 用量</a>
         <a class="admin-only" href="#groups" hidden>🏠 群組管理</a>
         <a class="admin-only" href="#line-groups" hidden>💬 LINE 群組</a>
@@ -153,7 +153,7 @@
         <label id="owner-option" class="checkbox-label" hidden><input name="is_owner" type="checkbox"> 設為擁有者</label>
         <button type="submit">加入</button>
       </form>
-      <p id="members-message" role="status">載入中…</p>
+      <output id="members-message">載入中…</output>
       <ul id="member-list" class="user-list"></ul>
       <section id="invite-section" class="invite-section" hidden>
         <h2 class="section-title">🔗 邀請連結</h2>
@@ -218,7 +218,7 @@
     </section>
 
     <!-- Status for whichever admin page is open; admin.js moves it under that page's title. -->
-    <p id="admin-message" role="status" hidden></p>
+    <output id="admin-message" hidden></output>
   </main>
 
   <!-- One shop's full card, sliding up over whichever page opened it. -->
@@ -261,7 +261,7 @@
       <h2>建立群組</h2>
       <p class="meta">建立後你就是擁有者，可以用 email 邀請朋友加入。群組裡的店大家都看得到，「我的清單」只有你自己看得到。</p>
       <label>群組名稱 <input name="name" maxlength="50" placeholder="例如：大學同學、公司午餐團"></label>
-      <p id="group-message" class="meta" role="status"></p>
+      <output id="group-message" class="meta"></output>
       <div class="actions">
         <button value="create">建立</button>
         <button value="cancel" class="secondary" formnovalidate>取消</button>
@@ -292,7 +292,7 @@
         <button value="search">搜尋</button>
       </div>
       <ul id="locate-candidates" class="candidates"></ul>
-      <p id="locate-message" class="meta" role="status"></p>
+      <output id="locate-message" class="meta"></output>
       <p class="meta attribution">搜尋結果由 Google 地圖提供</p>
       <div class="actions">
         <button value="manual" class="secondary">改用地圖拖曳圖釘</button>
@@ -304,7 +304,7 @@
   <template id="place-template">
     <li class="place">
       <div class="place-head">
-        <h2 class="name"></h2>
+        <h2 class="name">店家</h2>
         <span class="badge-new" hidden>新</span>
         <button class="star" type="button" aria-label="想吃"></button>
       </div>
