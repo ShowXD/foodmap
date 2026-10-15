@@ -202,6 +202,15 @@
   - 後端：`/api/places` POST 重複檢查改在同一句 INSERT（雙擊不會存兩筆；409 不再附 `place`）；PATCH 改用 `findAccessiblePlace`；`readCookie` 遇到格式錯誤的 cookie 回 null（原本整站 500）；`retryPendingAi` 出錯時把已認領的列標回 `ai_pending=1`；`schema.sql` 移除不再使用的 `extract_usage`（正式 DB 的表留著無害，未 DROP）；`cloudflare.md` 更正為 `user_daily_usage`
   - 刻意不做：16 個檔案各自的 `json()` 一行 helper 不合併；社群頁轉址改 `redirect: 'manual'`（目前抓完會再檢查網域，風險低）；`/api/places` 回傳完整 caption（清單破百筆再改成只回 has_caption）
   - 搜尋改在前端（使用者決定「今天吃什麼」永遠從整個清單抽，要縮小範圍用標籤）：`/api/places` 一律回傳整個清單（移除 `q` 參數與 LIKE 查詢）；`app.js` `matchesSearch` 比對店名、食物、地區、地址、標籤、備註、貼文文字，只影響清單與地圖；「今天吃什麼」與標籤選單用整個清單。打字不再發請求。本機驗證：搜尋「牛肉」清單剩 1 家、吃什麼仍從 6 家抽
+- **前端拆檔（2026-10-15）**：`app.js` 由 1,315 行拆為（單向依賴、無循環）：
+  - `shared.js`：`$`、`api`、`readSetting`/`saveSetting`、`openDialog`、`notify`（發 `foodmap:<name>` 事件）
+  - `state.js`：共用資料 `state`（lists、currentListId、places、filter、search、myPosition、myAccuracy、locationError、pinStyle）與純函式（`matchesFilter`、`distanceTo`、`isLocated`…）
+  - `me.js`：「我的」頁（名稱、大頭貼、圖釘樣式、登入方式）；改圖釘樣式發 `pin-style-changed`
+  - `add-form.js`：新增／編輯表單（`startEdit`、`resetForm`、`prefillFromShare`）；存檔發 `places-changed`
+  - `map.js`：地圖、圖釘、範圍圈、我的位置、拖曳、定位對話框；需要頁面的動作（開卡片、切到地圖、重新載入…）由 `app.js` 用 `connectMap({...})` 一次交給它
+  - `app.js`（549 行）：頁面切換、清單與卡片、篩選、今天吃什麼、群組、啟動流程
+  - 修正既有 bug：Google 拒絕金鑰後地圖物件還在，圖釘一畫就丟錯、連帶清單畫不出來 → `showMapFallback` 把 `map` 設為 null
+  - 驗證：每一步都在本機瀏覽器跑同一組冒煙測試（清單、搜尋、距離篩選、卡片、吃過／定位／編輯對話框、分享進來、新增與編輯存檔、今天吃什麼、我的頁、圖釘樣式、切換清單、地圖開啟置中於自己 zoom 15）；`npm test` 77/77。地圖實際外觀需真實金鑰，部署後確認
 - **後端共用邏輯移到 `lib/`（2026-10-15）**：路由檔只處理請求。`lib/social.js`（`isHttpUrl`、`isSocialUrl`、抓社群頁、og 標籤、`MAX_CAPTION_LENGTH` 統一一處）、`lib/ai.js`（`extractPlaces`、`parsePlaces`、`groundPlaces`）、`lib/place-ai.js`（`savePlace`、`fillFromAi`、`retryPendingAi`、`locateAutomatically`）。消除 `places.js → webhook.js → extract.js → places.js` 循環引用；`functions/` 之間不再互相 import。純搬移、行為不變：`npm test` 77/77、`wrangler pages functions build` 成功
 - **GitHub Actions 自動部署（2026-10-15，未在 GitHub 上跑過）**：`.github/workflows/deploy.yml`（push 到 main 或手動：`npm ci` → `npm test` → `wrangler pages deploy --branch main` → `scripts/prune-deployments.mjs`）。清理腳本用 Cloudflare API 只留最新 5 個部署＋目前上線的（canonical）部署；以模擬 API（30 個部署分兩頁、上線版是舊版）驗證刪 24 留 6。需 GitHub Secrets `CLOUDFLARE_API_TOKEN`（帳戶／Cloudflare Pages／編輯）、`CLOUDFLARE_ACCOUNT_ID`，步驟在 `cloudflare.md`「自動部署」。Actions 以版本 tag（v4）引用，未釘 SHA。改用 Actions 而非 Pages Git 連線：直接上傳建立的專案無法改接 Git，換專案要換網址
 - **隱私權頁公開（2026-10-14）**：Google OAuth 同意畫面發布前要求首頁、隱私權政策、服務條款網址，且隱私權頁要未登入也看得到 → middleware `PUBLIC_PATHS` 加 `/privacy`、`/privacy.html`；`privacy.html` 改為內嵌樣式、不再載入 `style.css`／`icon.svg`（不需公開其他檔案），`style.css` 移除 `.legal`。Cloudflare 需另建路徑 `privacy` 的 Bypass 應用程式（文件 `cloudflare.md`「完全開放」第 2 步）。驗證：`npm test` 72/72（access 測試：`/privacy` 不需登入、`/privacy-and-more` 與 `/style.css` 仍需登入）
