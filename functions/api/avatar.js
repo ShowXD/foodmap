@@ -4,7 +4,7 @@ const MAX_AVATAR_BYTES = 300 * 1024;
 const SIGNATURES = {
   'image/jpeg': (bytes) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
   'image/png': (bytes) => bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47,
-  'image/webp': (bytes) => String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.subarray(8, 12)) === 'WEBP',
+  'image/webp': (bytes) => String.fromCodePoint(...bytes.subarray(0, 4)) === 'RIFF' && String.fromCodePoint(...bytes.subarray(8, 12)) === 'WEBP',
 };
 
 const json = (body, status = 200) => Response.json(body, { status });

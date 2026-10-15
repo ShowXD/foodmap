@@ -15,7 +15,7 @@ export async function isValidLineSignature(secret, rawBody, signature) {
   if (!secret || !signature) return false;
   let signatureBytes;
   try {
-    signatureBytes = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
+    signatureBytes = Uint8Array.from(atob(signature), (c) => c.codePointAt(0));
   } catch {
     return false;
   }
