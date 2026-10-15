@@ -5,6 +5,7 @@ import { state } from './state.js';
 const addForm = $('add-form');
 const formMessage = $('form-message');
 const EDIT_FIELDS = ['name', 'dishes', 'area', 'address', 'tags', 'caption', 'note'];
+const FIELD_LABELS = { name: '店名', dishes: '食物', area: '地區', address: '地址', tags: '標籤' };
 const cancelEditButton = $('cancel-edit');
 const candidatesPanel = $('ai-candidates');
 const candidateList = $('candidate-list');
@@ -42,9 +43,18 @@ cancelEditButton.addEventListener('click', () => {
 });
 
 // Only fill blanks so AI never overwrites what someone typed by hand.
-function fillBlanks(place) {
-  for (const [field, text] of Object.entries(place)) {
-    if (text && !addForm.elements[field].value.trim()) addForm.elements[field].value = text;
+// Blanks are filled straight away; anything already typed is only replaced if the person agrees,
+// so running AI again can fix a bad earlier result without silently overwriting hand edits.
+function fillFromAi(place) {
+  const fields = Object.entries(place).filter(([, text]) => text);
+  const changed = fields.filter(([field, text]) => {
+    const current = addForm.elements[field].value.trim();
+    return current && current !== text;
+  });
+  const shouldReplace = changed.length > 0
+    && confirm(`AI 的結果和目前的${changed.map(([field]) => FIELD_LABELS[field]).join('、')}不同，要用 AI 的結果取代嗎？`);
+  for (const [field, text] of fields) {
+    if (!addForm.elements[field].value.trim() || shouldReplace) addForm.elements[field].value = text;
   }
 }
 
@@ -115,7 +125,7 @@ aiFillButton.addEventListener('click', async () => {
     const isEditing = Boolean(addForm.elements.id.value);
     if (extracted.places.length === 1 || isEditing) {
       hideCandidates();
-      fillBlanks(extracted.places[0]);
+      fillFromAi(extracted.places[0]);
       formMessage.textContent = 'AI 已填入，請確認後再儲存';
     } else {
       showCandidates(extracted.places);
