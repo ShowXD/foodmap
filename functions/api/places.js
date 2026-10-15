@@ -104,9 +104,11 @@ export async function onRequestPatch({ request, env, data }) {
   // Report "not found" for places in lists the user can't see, so ids don't leak.
   if (!(await findAccessiblePlace(env.DB, data.user, body.id))) return json({ error: 'not found' }, 404);
 
+  // Field names come from pickFields' allow-list, never from the request.
+  const assignments = keys.map((key) => `${key} = ?`).join(', ');
   const place = await env.DB
     // Once a person edits it, the background AI retry leaves it alone.
-    .prepare(`UPDATE places SET ${keys.map((k) => `${k} = ?`).join(', ')}, ai_pending = 0 WHERE id = ? RETURNING *`)
+    .prepare(`UPDATE places SET ${assignments}, ai_pending = 0 WHERE id = ? RETURNING *`)
     .bind(...Object.values(fields), body.id)
     .first();
   return json(place);

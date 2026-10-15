@@ -80,8 +80,13 @@ async function initMap() {
 const PIN_COLORS = { starred: ['#f59f00', '#b37400'], visited: ['#adb5bd', '#868e96'], todo: ['#d9480f', '#a8380b'] };
 
 const PIN_SCALES = { s: 0.8, m: 1, l: 1.3 };
+function pinState(place) {
+  if (place.starred) return 'starred';
+  return place.my_visited_at ? 'visited' : 'todo';
+}
+
 function pinFor(place) {
-  const [background, borderColor] = PIN_COLORS[place.starred ? 'starred' : place.my_visited_at ? 'visited' : 'todo'];
+  const [background, borderColor] = PIN_COLORS[pinState(place)];
   const scale = PIN_SCALES[state.pinStyle.size] ?? 1;
   let pin;
   if (state.pinStyle.shape === 'pin') {

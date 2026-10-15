@@ -38,8 +38,10 @@ export async function onRequestPatch({ request, env, data }) {
     return json({ error: '不能停用或降級自己' }, 400);
   }
 
+  // Field names come from the checks above, never from the request.
+  const assignments = keys.map((key) => `${key} = ?`).join(', ');
   const user = await env.DB
-    .prepare(`UPDATE users SET ${keys.map((key) => `${key} = ?`).join(', ')} WHERE id = ? RETURNING id, email, status, is_admin, created_at`)
+    .prepare(`UPDATE users SET ${assignments} WHERE id = ? RETURNING id, email, status, is_admin, created_at`)
     .bind(...Object.values(updates), body.id)
     .first();
   return user ? json(user) : json({ error: 'not found' }, 404);

@@ -27,7 +27,8 @@ export const state = {
 
 export const mapsUrl = (place) => {
   const query = encodeURIComponent([place.name, place.address || place.area].filter(Boolean).join(' '));
-  return `https://www.google.com/maps/search/?api=1&query=${query}${place.google_place_id ? `&query_place_id=${encodeURIComponent(place.google_place_id)}` : ''}`;
+  const placeId = place.google_place_id ? `&query_place_id=${encodeURIComponent(place.google_place_id)}` : '';
+  return `https://www.google.com/maps/search/?api=1&query=${query}${placeId}`;
 };
 export const isLocated = (place) => place.lat != null && place.lng != null;
 export const latLngOf = (place) => ({ lat: place.lat, lng: place.lng });

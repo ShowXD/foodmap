@@ -58,7 +58,8 @@ function renderLineGroups(lineGroups, groupLists) {
   }
   lineGroupList.replaceChildren(...lineGroups.map((group) => {
     const lastSeen = group.last_message_at ? `最後訊息 ${group.last_message_at}` : `加入於 ${group.first_seen_at}`;
-    const { item, actions } = card(`LINE 群組 …${group.group_id.slice(-6)}`, `${group.list_name ? `收進「${group.list_name}」` : '未綁定（不收連結）'} · ${lastSeen} (UTC)`);
+    const destination = group.list_name ? `收進「${group.list_name}」` : '未綁定（不收連結）';
+    const { item, actions } = card(`LINE 群組 …${group.group_id.slice(-6)}`, `${destination} · ${lastSeen} (UTC)`);
     const select = document.createElement('select');
     select.setAttribute('aria-label', '綁定到清單');
     select.append(new Option('不收連結', ''), ...groupLists.map((list) => new Option(`收進「${list.name}」`, list.id)));
@@ -126,7 +127,8 @@ async function load() {
   userList.replaceChildren(...users.map((user) => {
     const isMe = user.email === me.email;
     const status = user.status === 'disabled' ? '已停用' : '可使用';
-    const title = `${user.display_name ? `${user.display_name}・` : ''}${user.email}${isMe ? '（你）' : ''}`;
+    const shownName = user.display_name ? `${user.display_name}・` : '';
+    const title = `${shownName}${user.email}${isMe ? '（你）' : ''}`;
     const { item, actions } = card(title, `${status}${user.is_admin ? ' · 網站管理員' : ''} · 首次登入 ${user.created_at} (UTC)`);
     const memberships = document.createElement('p');
     memberships.className = 'meta';

@@ -151,7 +151,8 @@ function renderPlace(place) {
   star.addEventListener('click', () => toggleStar(place, star));
 
   const visit = card.querySelector('.visit');
-  visit.textContent = isVisited ? `吃過${place.my_rating ? ` ${place.my_rating}★` : ''}` : '吃過了';
+  const myRating = place.my_rating ? ` ${place.my_rating}★` : '';
+  visit.textContent = isVisited ? `吃過${myRating}` : '吃過了';
   visit.classList.toggle('secondary', isVisited);
   visit.addEventListener('click', () => openVisitDialog(place));
   const locate = card.querySelector('.locate');
@@ -247,7 +248,9 @@ async function openVisitDialog(place) {
     const visits = await api('GET', null, `?place=${place.id}`, '/api/visits');
     others.replaceChildren(...visits.filter((v) => !v.is_mine).map((v) => {
       const item = document.createElement('li');
-      item.textContent = `${v.name || v.email.split('@')[0]}：${v.rating ? `${v.rating} 分` : '吃過'}${v.note ? `，${v.note}` : ''}`;
+      const verdict = v.rating ? `${v.rating} 分` : '吃過';
+      const note = v.note ? `，${v.note}` : '';
+      item.textContent = `${v.name || v.email.split('@')[0]}：${verdict}${note}`;
       return item;
     }));
   } catch (error) {
