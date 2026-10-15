@@ -1017,14 +1017,6 @@ function saveSetting(key, value) {
   }
 }
 
-function readSavedListId() {
-  try {
-    return Number(localStorage.getItem(LIST_STORAGE_KEY));
-  } catch {
-    return 0;
-  }
-}
-
 function selectList(listId) {
   const list = lists.find((candidate) => candidate.id === listId) ?? lists[0];
   currentListId = list.id;
@@ -1033,17 +1025,13 @@ function selectList(listId) {
   $('members-link').href = `#members?list=${list.id}`;
   $('export-link').href = `/api/export?list=${list.id}`;
   filter = { mode: 'all', tag: null };
-  try {
-    localStorage.setItem(LIST_STORAGE_KEY, String(list.id));
-  } catch {
-    // Not remembering the choice is fine.
-  }
+  saveSetting(LIST_STORAGE_KEY, String(list.id));
 }
 
 async function loadLists() {
   lists = await api('GET', null, '', '/api/lists');
   listSelect.replaceChildren(...lists.map((list) => new Option(`${list.is_personal ? '👤' : '👥'} ${list.name}`, list.id)));
-  selectList(readSavedListId());
+  selectList(Number(readSetting(LIST_STORAGE_KEY)));
 }
 
 function switchToList(listId) {
