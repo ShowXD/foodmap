@@ -45,9 +45,8 @@
 - Cloudflare secrets：`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`ADMIN_EMAILS`、`LINE_CHANNEL_SECRET`、`GOOGLE_MAPS_BROWSER_KEY`、`GOOGLE_MAPS_MAP_ID`、`GOOGLE_PLACES_KEY`；選填 `LINE_BOT_ID`（是否已設未確認）
 
 ## 待使用者處理
-1. Google Cloud：`GetPlace` 每日上限至少 60（座標更新 30＋評分 30，`docs/setup/google.md`）
-2. Google Cloud：啟用 YouTube Data API v3 並加進伺服器金鑰的 API 限制（未啟用時 YouTube 退回只讀 og 標籤）
-3. 部署後手機確認：距離篩選的範圍圈與縮放、Google 評分顯示
+- 部署後手機確認：距離篩選的範圍圈與縮放、Google 評分顯示、YouTube 連結的 AI 填入是否帶出完整說明欄
+- 已完成（使用者 2026-10-16 回報）：Google Cloud `GetPlace` 每日上限 60；啟用 YouTube Data API v3 並加進伺服器金鑰的 API 限制；Auth0 post-login Action「Require verified email」
 
 ## 未驗證（需真機或正式環境）
 - 定位準確度改善（`maximumAge: 0`、誤差圈、精確位置提示）
@@ -57,7 +56,7 @@
 - 帳號綁定在正式環境的登出再登入流程
 - 群組擁有者用綁定碼綁真實 LINE 群組
 - 真實 IG／FB／Threads 貼文的 og:image 縮圖成功率
-- Auth0「未驗證信箱被擋」的 post-login Action 是否已設（`docs/setup/password-login.md`，未設時可冒用他人 email）
+- Auth0 擋下未驗證信箱：Action 已設（使用者回報），未實測用未驗證的新帳號登入是否被擋
 
 ## 已知問題與限制
 - 部分既有 AI 標籤是簡體字（如「予駕鸡」）：新資料已要求繁體，舊的用「管理標籤」手動改
@@ -84,5 +83,5 @@
 - 瀏覽器測試注意：同網址只改 `#` 不會重新載入程式，要強制重新整理；停止 wrangler 後 `workerd.exe` 可能殘留佔住 port
 
 ## 下一步
-- 等使用者處理上方「待使用者處理」並回報手機實測結果
+- 等使用者回報上方手機實測結果
 - 可考慮（使用者未要求）：營業時間（同評分做法，按需查、不儲存）、簡體標籤自動轉繁體
