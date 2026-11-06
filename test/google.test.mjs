@@ -214,6 +214,27 @@ test('疑似亂碼: the list flags it, AI re-analysis replaces the garbled field
   googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
 });
 
+test('沒定位: AI re-analysis replaces the name Google couldn\'t match, but keeps a person\'s wording', async () => {
+  const { DB, env, mom, call, row } = await setup();
+  const caption = '#江家餛飩麵 📍臺中市西區華美街204號 紅油炒手';
+  DB.sqlite.prepare(`INSERT INTO places (id, list_id, url, caption, name, hand_edited, source) VALUES
+    (40, 1, 'https://fb.watch/h', ?, '我家巷口那間', 1, 'line'),
+    (41, 1, 'https://fb.watch/i', ?, '江家', 0, 'line')`).run(caption, caption);
+  env.AI = { run: async () => ({ response: { places: [{ name: '江家餛飩麵', address: '臺中市西區華美街204號' }] } }) };
+  googleReply = () => Response.json({ places: [{ ...googleHit('江家餛飩麵（華美街）'), formattedAddress: '403台灣台中市西區華美街204號' }] });
+
+  const kept = await call(reanalyze.onRequestPost, mom, { body: { place_id: 40 } });
+  assert.deepEqual([kept.status, kept.body.located], [200, true]);
+  assert.deepEqual([row(40).name, row(40).address], ['我家巷口那間', '臺中市西區華美街204號'], 'hand-edited name kept, blank address filled');
+  DB.sqlite.exec('DELETE FROM places WHERE id = 40'); // otherwise 41 would merge into it once placed
+
+  const replaced = await call(reanalyze.onRequestPost, mom, { body: { place_id: 41 } });
+  assert.deepEqual([replaced.status, replaced.body.located], [200, true]);
+  assert.deepEqual([row(41).name, row(41).google_place_id], ['江家餛飩麵', GOOGLE_ID]);
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 41 } })).status, 409, 'on the map now');
+  googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
+});
+
 test('LINE: a shop is located automatically only when Google\'s top hit has the same name', async () => {
   const { DB, env } = await setup();
   DB.sqlite.exec("INSERT INTO line_groups (group_id, list_id) VALUES ('Cgroup', 1)");
