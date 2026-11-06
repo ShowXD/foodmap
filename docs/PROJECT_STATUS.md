@@ -51,6 +51,7 @@
 ## 未驗證（需真機或正式環境）
 - 定位準確度改善（`maximumAge: 0`、誤差圈、精確位置提示）
 - Android：Web Share Target 從 LINE 分享進來；手勢列顏色（manifest `background_color`）
+- 手機「安裝應用程式」（2026-11-06 修正，未部署）：manifest 預設不帶 cookie，被 Access 302 到登入頁（已用 curl 確認 `/manifest.webmanifest` 未登入回 302）而無法安裝；`index.html` 的 manifest 連結加上 `crossorigin="use-credentials"`。若仍不行，備案是為 `/manifest.webmanifest`、`/icon.svg` 建 Access Bypass 並加進 middleware 的 `PUBLIC_PATHS`
 - 經 Access 登入後邀請碼 query 是否保留（現在先到 `/welcome/` 再帶進 App）
 - Access `/cdn-cgi/access/get-identity` 是否回傳 `name`（自動帶入名稱）
 - 帳號綁定在正式環境的登出再登入流程

@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#fffaf5" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
   <title>美食地圖</title>
-  <link rel="manifest" href="manifest.webmanifest">
+  <!-- Browsers fetch the manifest without cookies by default; behind Access that returns the login redirect and the app is not installable. -->
+  <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
