@@ -5,7 +5,7 @@ import { fillFromAi } from '../../lib/place-ai.js';
 
 const json = (body, status = 200) => Response.json(body, { status });
 
-/** POST {place_id}: runs AI again on a nameless or garbled place's saved post text, fixes it and locates it. */
+/** POST {place_id}: runs AI again on a nameless, garbled or unlocated (沒定位) place's saved post text, fixes it and locates it. */
 export async function onRequestPost({ request, env, data }) {
   if (!env.AI) return json({ error: 'AI 擷取尚未設定 Workers AI 綁定' }, 503);
   const body = await request.json().catch(() => null);
@@ -14,7 +14,9 @@ export async function onRequestPost({ request, env, data }) {
   const place = await env.DB.prepare('SELECT * FROM places WHERE id = ?').bind(access.id).first();
   // Nameless places, and places whose name/address/area look garbled (see garbledFields).
   const garbled = garbledFields(place);
-  if (place.name && garbled.length === 0) return json({ error: '這家店已經有店名了' }, 409);
+  // Named but not on the map (沒定位): the AI may read the post better this time.
+  const isUnlocated = Boolean(place.name) && place.lat == null;
+  if (place.name && garbled.length === 0 && !isUnlocated) return json({ error: '這家店已經有店名和定位了' }, 409);
   if (!place.caption) return json({ error: '沒有存到貼文文字，請按「編輯」貼上貼文後用 AI 自動填入' }, 422);
   if (!(await takeUserQuota(env.DB, data.user.id, 'workers_ai'))) {
     return json({ error: `今天的 AI 擷取已達 ${APIS.workers_ai.perUserDaily} 次上限，明天再試` }, 429);
@@ -25,7 +27,9 @@ export async function onRequestPost({ request, env, data }) {
   if (error === 'unavailable') return json({ error: 'AI 暫時無法使用（可能已達今日免費額度），明天再試' }, 502);
   if (error === 'unusable') return json({ error: 'AI 回傳格式錯誤，請再試一次或手動填寫' }, 502);
   if (places.length === 0) return json({ error: 'AI 在貼文裡找不到店家，請手動填寫' }, 422);
-  const { located } = await fillFromAi(env, place, places, garbled);
+  // The AI's name/address/area replace the ones Google couldn't match, unless a person wrote them.
+  const replace = isUnlocated && !place.hand_edited ? [...new Set([...garbled, 'name', 'address', 'area'])] : garbled;
+  const { located } = await fillFromAi(env, place, places, replace, isUnlocated);
   // located false: it has a name now but Google gave no sure match, so the app asks the person to pick.
   return json({ shops: places.length, located });
 }
