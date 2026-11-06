@@ -118,6 +118,15 @@ function openFilterPanel() {
   openDialog(filterDialog);
 }
 
+// A tap on the backdrop closes the sheet like 完成 (filters apply as they are picked). Backdrop taps and
+// taps on the sheet's own padding both target the dialog, so the position tells them apart.
+filterDialog.addEventListener('click', (event) => {
+  if (event.target !== filterDialog) return;
+  const box = filterDialog.getBoundingClientRect();
+  const isInside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+  if (!isInside) filterDialog.close();
+});
+
 $('filter-clear').addEventListener('click', () => change(() => {
   state.filter = emptyFilter();
   state.sort = 'newest';
