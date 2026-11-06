@@ -8,3 +8,6 @@
 .env.*
 
 node_modules/
+
+# Local progress/handoff notes
+docs/PROJECT_STATUS.md
