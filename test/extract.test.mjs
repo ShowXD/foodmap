@@ -118,6 +118,40 @@ test('extract returns every shop the AI found, 422 when none, and 502 when AI fa
   assert.equal(failed.status, 502);
 });
 
+test('when the post text names no shop, the cover image is read and its text joins the caption', async () => {
+  const extract = await asUser('mom@example.test');
+  const realFetch = globalThis.fetch;
+  const fetched = [];
+  globalThis.fetch = async (url) => {
+    fetched.push(String(url));
+    if (String(url).startsWith('https://cdn.example/')) return new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/jpeg' } });
+    return new Response('<meta property="og:description" content="台中新開的西式鐵板燒"><meta property="og:image" content="https://cdn.example/cover.jpg">');
+  };
+  const models = [];
+  const AI = {
+    run: async (model, { messages }) => {
+      models.push(model);
+      if (Array.isArray(messages[1].content)) return { response: { text: '心焰鐵板燒 文心路四段938號', places: [{ name: '心焰鐵板燒', address: '文心路四段938號' }] } };
+      return { response: { places: messages[1].content.includes('心焰') ? [{ name: '心焰鐵板燒' }] : [] } };
+    },
+  };
+  try {
+    const fromCover = await extract({ url: 'https://www.threads.com/@a/post/x' }, AI);
+    assert.equal(fromCover.status, 200);
+    const body = await fromCover.json();
+    assert.equal(body.caption, '台中新開的西式鐵板燒\n封面圖文字：心焰鐵板燒 文心路四段938號');
+    assert.deepEqual(body.places.map((place) => place.name), ['心焰鐵板燒']);
+    assert.equal(models.length, 2, 'text first, then the image');
+
+    // The text already names the shop: the cover is never downloaded.
+    fetched.length = 0;
+    assert.equal((await extract({ url: 'https://www.threads.com/@a/post/x', caption: '心焰鐵板燒' }, AI)).status, 200);
+    assert.ok(!fetched.some((url) => url.startsWith('https://cdn.example/')));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test('each user gets a daily AI extraction limit; the AI is not called once it is used up', async () => {
   const extract = await asUser('mom@example.test');
   let aiCalls = 0;

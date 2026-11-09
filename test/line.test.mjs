@@ -140,6 +140,25 @@ test('text typed with a link and the post\'s own text both reach the AI and are 
   assert.equal(DB.sqlite.prepare("SELECT caption FROM places WHERE line_message_id = 't1'").get().caption, '心焰鐵板燒 文心路四段938號\n台中新開一間西式鐵板燒');
 });
 
+test('a bare link whose text names no shop is saved first, then filled from its cover image', async () => {
+  const { DB, send } = setup({
+    run: async (_model, { messages }) => (Array.isArray(messages[1].content)
+      ? { response: { text: '心焰鐵板燒', places: [{ name: '心焰鐵板燒' }] } }
+      : { response: { places: [] } }),
+  });
+  DB.sqlite.exec(`INSERT INTO line_groups (group_id, list_id) VALUES ('${GROUP}', 1)`);
+  globalThis.fetch = async (url) => (String(url).startsWith('https://cdn.example/')
+    ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/jpeg' } })
+    : new Response('<meta property="og:description" content="台中新開的鐵板燒"><meta property="og:image" content="https://cdn.example/c.jpg">'));
+  try {
+    await send([textEvent('c1', 'https://www.threads.com/@a/post/x')]);
+  } finally {
+    globalThis.fetch = async () => new Response('', { status: 404 });
+  }
+  const saved = DB.sqlite.prepare("SELECT name, caption FROM places WHERE line_message_id = 'c1'").all().map((row) => ({ ...row }));
+  assert.deepEqual(saved, [{ name: '心焰鐵板燒', caption: '台中新開的鐵板燒\n封面圖文字：心焰鐵板燒' }]);
+});
+
 test('links are never lost: AI failure or no caption saves the bare link', async () => {
   const failingAI = { run: async () => { throw new Error('quota'); } };
   const { DB, send, places } = setup(failingAI);

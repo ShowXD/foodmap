@@ -1,30 +1,8 @@
 import { findAccessiblePlace } from '../../lib/lists.js';
-import { fetchSocialPage, isSocialUrl, readLimited, readOgMeta } from '../../lib/social.js';
+import { fetchThumbnail } from '../../lib/social.js';
 import { takeUserQuota } from '../../lib/usage.js';
 
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const MAX_IMAGE_BYTES = 1024 * 1024;
 const RETRY_FAILED_AFTER = '-3 days';
-
-/** The post's og:image, downloaded now because the IG/FB CDN link stops working after a while. */
-export async function fetchThumbnail(url) {
-  if (!isSocialUrl(url)) return null;
-  const imageUrl = readOgMeta(await fetchSocialPage(url), 'og:image');
-  if (!imageUrl.startsWith('https://')) return null;
-  try {
-    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(8000) });
-    const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
-    if (!response.ok || !IMAGE_TYPES.has(contentType)) {
-      await response.body?.cancel();
-      return null;
-    }
-    const { bytes, truncated } = await readLimited(response, MAX_IMAGE_BYTES);
-    return truncated ? null : { contentType, bytes };
-  } catch (error) {
-    console.warn('Thumbnail fetch failed', url, error.message);
-    return null;
-  }
-}
 
 const notFound = () => new Response('no thumbnail', { status: 404, headers: { 'Cache-Control': 'private, max-age=3600' } });
 

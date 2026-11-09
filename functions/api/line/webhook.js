@@ -1,5 +1,5 @@
 import { aiModel, extractPlaces } from '../../../lib/ai.js';
-import { locateAutomatically, savePlace } from '../../../lib/place-ai.js';
+import { fillFromCover, locateAutomatically, savePlace } from '../../../lib/place-ai.js';
 import { fetchCaption, isSocialUrl, MAX_CAPTION_LENGTH } from '../../../lib/social.js';
 import { fetchYoutubeText } from '../../../lib/youtube.js';
 import { recordUsage } from '../../../lib/usage.js';
@@ -112,10 +112,15 @@ async function collectLinks(env, event) {
     const { places, isAiPending } = await analysePost(env, listId, caption);
     // Never lose a link: if AI found nothing, save the bare link for manual editing (or a later retry).
     const post = { list_id: listId, url, caption, source: 'line', line_message_id: event.message.id };
-    if (places.length === 0) await savePlace(env.DB, post, {}, isAiPending);
+    const savedIds = places.length === 0 ? [await savePlace(env.DB, post, {}, isAiPending)] : [];
     for (const place of places) {
-      await locateAutomatically(env, await savePlace(env.DB, post, place), place);
+      const placeId = await savePlace(env.DB, post, place);
+      savedIds.push(placeId);
+      await locateAutomatically(env, placeId, place);
     }
+    // The text named no shop: try the cover image, only now that the link is saved, since reading an image
+    // can take long enough to be cut off by the background time limit (then the bare link simply stays).
+    if (!places.some((place) => place.name) && !isAiPending && env.AI && savedIds[0]) await fillFromCover(env, savedIds[0], url);
   }
 }
 
