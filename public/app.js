@@ -82,6 +82,9 @@ function thumbnailFor(place, className) {
   frame.className = `thumb ${className}`;
   const image = document.createElement('img');
   image.loading = 'lazy';
+  // The stored cover is the post's full-size image (often 1080×1920) shown at 56 px; decoding a screenful
+  // of those must not hold up the page-slide animation.
+  image.decoding = 'async';
   image.alt = '';
   image.src = `/thumb/${place.id}`;
   image.addEventListener('error', () => image.remove());
