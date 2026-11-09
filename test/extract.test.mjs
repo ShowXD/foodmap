@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { onRequestPost, DAILY_EXTRACT_LIMIT } from '../functions/api/extract.js';
-import { garbledFields, parsePlaces, groundPlaces } from '../lib/ai.js';
+import { extractPlaces, garbledFields, isPosterName, parsePlaces, posterNames, groundPlaces } from '../lib/ai.js';
 import { fetchSocialPage, isSocialUrl, parseOgText } from '../lib/social.js';
 import { ensureUser } from '../lib/users.js';
 import { createTestDb } from './d1.mjs';
@@ -85,6 +85,23 @@ test('garbledFields flags name/address/area with characters the post never uses,
   assert.deepEqual(garbledFields({ ...garbled, name: '江家餛飩', address: '台中市西區華美街204號' }), []);
   assert.deepEqual(garbledFields({ ...garbled, hand_edited: 1 }), [], 'a person\'s own wording is trusted');
   assert.deepEqual(garbledFields({ ...garbled, caption: '' }), [], 'nothing to compare against');
+});
+
+test('the poster is never taken for a shop, unless the account is the shop itself', async () => {
+  const threads = 'Threads 上的多莉 Dolly ｜ 台中美食 景點 探店（@dollybb_777）\n吃幾次愛幾次 試營運時間';
+  assert.deepEqual(posterNames(threads), ['多莉 Dolly', 'dollybb_777']);
+  const facebook = '120 萬次觀看 · 4,885 個心情 | 台中排隊芒果雪花冰 | 水星人的怪咖時代\n台中排隊芒果雪花冰';
+  assert.deepEqual(posterNames(facebook), ['水星人的怪咖時代']);
+  // Only two parts: the last one is the post, which names the shop.
+  assert.deepEqual(posterNames('19 萬次觀看 · 486 個心情 | 牛範生台式蒜香牛排'), []);
+  // A shop's own account is kept.
+  assert.deepEqual(posterNames('Threads 上的光之谷 l 台灣果萃茶飲（@guangzhigu2023）'), ['guangzhigu2023']);
+  assert.ok(isPosterName('多莉Dolly', posterNames(threads)));
+  assert.ok(!isPosterName('台中世外桃源', posterNames(threads)));
+
+  const ai = { run: async () => ({ response: { places: [{ name: '水星人的怪咖時代', dishes: '芒果雪花冰', area: '台中' }, { name: '台中世外桃源' }] } }) };
+  const { places } = await extractPlaces(ai, `${facebook}\n台中世外桃源也很好吃`, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
+  assert.deepEqual(places.map((place) => [place.name, place.dishes]), [['', '芒果雪花冰'], ['台中世外桃源', '']]);
 });
 
 test('extract returns 503 when the AI binding is missing', async () => {
