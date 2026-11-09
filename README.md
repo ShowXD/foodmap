@@ -23,7 +23,7 @@
 | 前端 | 原生 HTML／CSS／JavaScript（ES modules），PWA |
 | 後端 | Cloudflare Pages Functions |
 | 資料庫 | Cloudflare D1（SQLite） |
-| AI | Cloudflare Workers AI（Llama 3.3 70B、Qwen3 30B、Gemma 4 26B） |
+| AI | Cloudflare Workers AI（Llama 3.3 70B、Mistral Small 3.1、Gemma 4 26B） |
 | 登入 | Cloudflare Access（Google、Email 驗證碼，可接 Auth0 帳號密碼） |
 | 地圖 | Google Maps JavaScript API、Places API (New) |
 | 部署 | GitHub Actions → Cloudflare Pages |

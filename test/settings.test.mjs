@@ -7,7 +7,7 @@ import * as settings from '../functions/api/settings.js';
 import * as extract from '../functions/api/extract.js';
 import * as extractImage from '../functions/api/extract-image.js';
 
-const QWEN = '@cf/qwen/qwen3-30b-a3b-fp8';
+const MISTRAL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
 
 async function setup() {
   const DB = createTestDb();
@@ -18,56 +18,65 @@ async function setup() {
     const response = await handler({ request, env: { DB, ...env }, data: { user: as } });
     return { status: response.status, body: await response.json() };
   };
-  return { admin, kid, call };
+  return { DB, admin, kid, call };
 }
 
 test('only site admins see or change the AI model, and only to a model from the tested list', async () => {
   const { admin, kid, call } = await setup();
   assert.equal((await call(settings.onRequestGet, kid)).status, 403);
-  assert.equal((await call(settings.onRequestPut, kid, { method: 'PUT', body: { ai_model: QWEN } })).status, 403);
+  assert.equal((await call(settings.onRequestPut, kid, { method: 'PUT', body: { ai_model: MISTRAL } })).status, 403);
 
   const before = (await call(settings.onRequestGet, admin)).body;
   assert.equal(before.ai_model, DEFAULT_AI_MODEL);
-  assert.ok(before.models.some((model) => model.id === QWEN));
+  assert.ok(before.models.some((model) => model.id === MISTRAL));
 
   assert.equal((await call(settings.onRequestPut, admin, { method: 'PUT', body: { ai_model: '@cf/some/untested-model' } })).status, 400);
-  assert.equal((await call(settings.onRequestPut, admin, { method: 'PUT', body: { ai_model: QWEN } })).status, 200);
-  assert.equal((await call(settings.onRequestGet, admin)).body.ai_model, QWEN);
+  assert.equal((await call(settings.onRequestPut, admin, { method: 'PUT', body: { ai_model: MISTRAL } })).status, 200);
+  assert.equal((await call(settings.onRequestGet, admin)).body.ai_model, MISTRAL);
 });
 
 test('AI extraction runs on the chosen model', async () => {
   const { admin, kid, call } = await setup();
-  await call(settings.onRequestPut, admin, { method: 'PUT', body: { ai_model: QWEN } });
+  await call(settings.onRequestPut, admin, { method: 'PUT', body: { ai_model: MISTRAL } });
   const used = [];
   const AI = { run: async (model) => { used.push(model); return { response: { places: [{ name: '阿宗麵線' }] } }; } };
   const response = await call(extract.onRequestPost, kid, { method: 'POST', body: { caption: '阿宗麵線好吃' }, env: { AI } });
   assert.equal(response.status, 200);
-  assert.deepEqual(used, [QWEN]);
+  assert.deepEqual(used, [MISTRAL]);
 });
 
-test('auto: Llama first; only a garbled or failed answer is retried with Qwen, keeping the more complete one', async () => {
+test('a saved choice naming a retired model (Qwen3 30B) falls back to auto instead of failing', async () => {
+  const { DB, kid, call } = await setup();
+  DB.sqlite.exec("INSERT INTO settings (key, value) VALUES ('ai_model', '@cf/qwen/qwen3-30b-a3b-fp8') ON CONFLICT (key) DO UPDATE SET value = excluded.value");
+  const used = [];
+  const AI = { run: async (model) => { used.push(model); return { response: { places: [{ name: '阿宗麵線' }] } }; } };
+  assert.equal((await call(extract.onRequestPost, kid, { method: 'POST', body: { caption: '阿宗麵線好吃' }, env: { AI } })).status, 200);
+  assert.deepEqual(used, ['@cf/meta/llama-3.3-70b-instruct-fp8-fast']);
+});
+
+test('auto: Llama first; only a garbled or failed answer is retried with Mistral, keeping the more complete one', async () => {
   const caption = '#江家餛飩 📍臺中市西區華美街204號 紅油炒手';
   const answers = {
     '@cf/meta/llama-3.3-70b-instruct-fp8-fast': { name: '江家予駕', address: '臺中市西區華美街204號', dishes: '紅油炒手' },
-    [QWEN]: { name: '江家餛飩', address: '臺中市西區華美街204號', dishes: '紅油炒手' },
+    [MISTRAL]: { name: '江家餛飩', address: '臺中市西區華美街204號', dishes: '紅油炒手' },
   };
   const used = [];
   const ai = (overrides = {}) => ({ run: async (model) => {
-    used.push(model.includes('qwen') ? 'qwen' : 'llama');
+    used.push(model.includes('mistral') ? 'mistral' : 'llama');
     if (overrides[model] instanceof Error) throw overrides[model];
     return { response: { places: [overrides[model] ?? answers[model]] } };
   } });
 
   assert.equal((await extractPlaces(ai(), caption)).places[0].name, '江家餛飩');
-  assert.deepEqual(used.splice(0), ['llama', 'qwen'], 'garbled name: retried');
+  assert.deepEqual(used.splice(0), ['llama', 'mistral'], 'garbled name: retried');
 
-  const clean = { '@cf/meta/llama-3.3-70b-instruct-fp8-fast': answers[QWEN] };
+  const clean = { '@cf/meta/llama-3.3-70b-instruct-fp8-fast': answers[MISTRAL] };
   assert.equal((await extractPlaces(ai(clean), caption)).places[0].name, '江家餛飩');
   assert.deepEqual(used.splice(0), ['llama'], 'clean answer: one call only');
 
   const llamaDown = { '@cf/meta/llama-3.3-70b-instruct-fp8-fast': new Error('busy') };
   assert.equal((await extractPlaces(ai(llamaDown), caption)).places[0].name, '江家餛飩');
-  assert.deepEqual(used.splice(0), ['llama', 'qwen'], 'failed answer: retried');
+  assert.deepEqual(used.splice(0), ['llama', 'mistral'], 'failed answer: retried');
 });
 
 test('screenshots: the copied text becomes the caption and the shops are checked against it', async () => {
@@ -106,5 +115,5 @@ test('extractPlaces reads both Llama-style and OpenAI-style answers', async () =
   const llama = { run: async () => ({ response: JSON.parse(json) }) };
   const openai = { run: async () => ({ choices: [{ message: { content: json } }] }) };
   assert.equal((await extractPlaces(llama, '阿宗麵線')).places[0].name, '阿宗麵線');
-  assert.equal((await extractPlaces(openai, '阿宗麵線', QWEN)).places[0].name, '阿宗麵線');
+  assert.equal((await extractPlaces(openai, '阿宗麵線', MISTRAL)).places[0].name, '阿宗麵線');
 });
