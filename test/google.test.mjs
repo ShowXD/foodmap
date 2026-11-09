@@ -240,6 +240,28 @@ test('沒定位: AI re-analysis replaces the name Google couldn\'t match, but ke
   googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
 });
 
+test('AI 重新分析 with no saved post text reads the post again and keeps it', async () => {
+  const { DB, env, mom, call, row } = await setup();
+  DB.sqlite.exec(`INSERT INTO places (id, list_id, url, caption, source) VALUES
+    (50, 1, 'https://www.threads.com/@a/post/z', NULL, 'line'),
+    (51, 1, 'https://example.com/not-social', NULL, 'manual')`);
+  env.AI = { run: async () => ({ response: { places: [{ name: '江家餛飩', address: '臺中市西區華美街204號' }] } }) };
+  googleReply = () => Response.json({ places: [{ ...googleHit('江家餛飩'), formattedAddress: '403台灣台中市西區華美街204號' }] });
+  const mocked = globalThis.fetch;
+  globalThis.fetch = async (url, init) => (String(url).includes('threads.com')
+    ? new Response('<meta property="og:description" content="#江家餛飩 📍臺中市西區華美街204號">')
+    : mocked(url, init));
+  try {
+    const analysed = await call(reanalyze.onRequestPost, mom, { body: { place_id: 50 } });
+    assert.deepEqual([analysed.status, analysed.body.located], [200, true]);
+    assert.deepEqual([row(50).caption, row(50).name], ['#江家餛飩 📍臺中市西區華美街204號', '江家餛飩']);
+    assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 51 } })).status, 422, 'nothing to read again');
+  } finally {
+    globalThis.fetch = mocked;
+    googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
+  }
+});
+
 test('LINE: a shop is located automatically only when Google\'s top hit has the same name', async () => {
   const { DB, env } = await setup();
   DB.sqlite.exec("INSERT INTO line_groups (group_id, list_id) VALUES ('Cgroup', 1)");

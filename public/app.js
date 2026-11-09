@@ -236,7 +236,8 @@ async function mergeDuplicates(place, button) {
   }
 }
 
-const canReanalyze = (place) => Boolean(place.caption) && (!place.name || Boolean(place.garbled?.length) || (!isLocated(place) && !place.google_place_id));
+// No saved post text is fine too: the server reads the post again (and its cover) before giving up.
+const canReanalyze = (place) => !place.name || Boolean(place.garbled?.length) || (!isLocated(place) && !place.google_place_id);
 const reanalyzeAllButton = $('reanalyze-all');
 // The batch follows the chosen chip, search and tag (e.g. only 疑似亂碼), so people pick what to spend AI on.
 const reanalyzeTargets = () => state.places.filter((place) => canReanalyze(place) && matchesFilter(place));
