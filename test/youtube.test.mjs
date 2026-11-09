@@ -22,13 +22,18 @@ test('fetchYoutubeText joins title, full description and top comments; comments 
   let commentsOff = false;
   globalThis.fetch = async (url) => {
     requested.push(new URL(url).pathname.split('/').pop());
-    if (url.includes('/videos?')) return Response.json({ items: [{ snippet: { title: '台中必吃餛飩', description: '江家餛飩\n臺中市西區華美街204號' } }] });
+    if (url.includes('/videos?')) return Response.json({ items: [{ snippet: { channelId: 'UCcreator', title: '台中必吃餛飩', description: '江家餛飩\n臺中市西區華美街204號' } }] });
     if (commentsOff) return new Response('{}', { status: 403 });
-    return Response.json({ items: [{ snippet: { topLevelComment: { snippet: { textDisplay: '週日公休喔' } } } }] });
+    assert.match(url, /part=snippet%2Creplies/);
+    const reply = (channel, text) => ({ snippet: { authorChannelId: { value: channel }, textDisplay: text } });
+    return Response.json({ items: [{
+      snippet: { topLevelComment: { snippet: { textDisplay: '週日公休喔' } } },
+      replies: { comments: [reply('UCstranger', '我也想吃'), reply('UCcreator', '營業到晚上八點')] },
+    }] });
   };
   try {
     const env = { DB, GOOGLE_PLACES_KEY: 'test-key' };
-    assert.equal(await fetchYoutubeText(env, 'https://youtu.be/AbCdEfGhIjk'), '台中必吃餛飩\n江家餛飩\n臺中市西區華美街204號\n留言：\n週日公休喔');
+    assert.equal(await fetchYoutubeText(env, 'https://youtu.be/AbCdEfGhIjk'), '台中必吃餛飩\n江家餛飩\n臺中市西區華美街204號\n留言：\n週日公休喔\n營業到晚上八點', 'only the creator\'s reply is kept');
     commentsOff = true;
     assert.equal(await fetchYoutubeText(env, 'https://youtu.be/AbCdEfGhIjk'), '台中必吃餛飩\n江家餛飩\n臺中市西區華美街204號');
     assert.deepEqual(requested, ['videos', 'commentThreads', 'videos', 'commentThreads']);
