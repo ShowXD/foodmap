@@ -298,7 +298,8 @@ export function openLocateDialog(place) {
   if (isFixing) {
     locateMessage.textContent = '輸入完整地址（例如：台北市大安區復興南路一段 1 號）或店名，再按搜尋';
     locateForm.elements.query.focus();
-  } else if (place.name) {
+  } else if (place.name || place.caption) {
+    // No name: the server searches with the post's own description of the shop.
     void searchLocation(); // reports its own errors in the dialog
   } else {
     locateMessage.textContent = '還沒有店名，請輸入店名或完整地址';
@@ -340,6 +341,8 @@ async function chooseLocation(place, candidate) {
     await page.reloadPlaces();
     const updated = state.places.find((candidateRow) => candidateRow.id === keptId);
     if (updated) page.focusPlace(updated);
+    // Google's terms only let us keep the place ID, so its name can't be filled in for the person.
+    if (updated && !updated.name) alert(`已定位。請按「編輯」把店名（${candidate.name}）補上。`);
   } catch (error) {
     locateMessage.textContent = `儲存失敗：${error.message}`;
   }

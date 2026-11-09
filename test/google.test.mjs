@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createTestDb } from './d1.mjs';
 import { ensureUser } from '../lib/users.js';
 import { APIS } from '../lib/usage.js';
-import { isSameAddress, isSameShop, refreshStaleLocations, searchPlaces } from '../lib/google.js';
+import { describeQuery, isSameAddress, isSameShop, refreshStaleLocations, searchPlaces } from '../lib/google.js';
 import * as reanalyze from '../functions/api/reanalyze.js';
 import * as places from '../functions/api/places.js';
 import * as placeSearch from '../functions/api/place-search.js';
@@ -265,6 +265,22 @@ test('AI 重新分析 with no saved post text reads the post again and keeps it'
     globalThis.fetch = mocked;
     googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
   }
+});
+
+test('a shop with no name is searched by the post\'s own description', async () => {
+  assert.equal(
+    describeQuery({ area: '台中', caption: '13 萬次觀看 · 572 個心情 | 台中超美台菜餐廳😍 隱藏在宮原眼科裡 #台中美食 https://fb.watch/x' }),
+    '台中 台中超美台菜餐廳 隱藏在宮原眼科裡',
+  );
+  assert.equal(describeQuery({ caption: 'Threads 上的莊（@zy1.7__） 台中這間飲料店買一送一' }), '台中這間飲料店買一送一');
+
+  const { DB, mom, call } = await setup();
+  DB.sqlite.exec("INSERT INTO places (id, list_id, url, caption) VALUES (70, 1, 'https://fb.watch/d', '台中超美台菜餐廳 隱藏在宮原眼科裡')");
+  sent.length = 0;
+  const found = await call(placeSearch.onRequestPost, mom, { body: { place_id: 70 } });
+  assert.equal(found.status, 200);
+  assert.equal(found.body.query, '台中超美台菜餐廳 隱藏在宮原眼科裡');
+  assert.equal(JSON.parse(sent[0].init.body).textQuery, '台中超美台菜餐廳 隱藏在宮原眼科裡');
 });
 
 test('auto-locating takes the first of Google\'s hits that matches, not only the top one', async () => {
