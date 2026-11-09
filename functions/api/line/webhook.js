@@ -106,7 +106,9 @@ async function collectLinks(env, event) {
     const seen = await env.DB.prepare('SELECT 1 FROM places WHERE line_message_id = ? AND url = ?').bind(event.message.id, url).first();
     if (seen) continue;
 
-    const caption = messageText || ((await fetchYoutubeText(env, url)) || (await fetchCaption(url))).slice(0, MAX_CAPTION_LENGTH);
+    // What the sender typed (e.g. the shop name from the comments) and the post's own text both go to the AI.
+    const pageText = (await fetchYoutubeText(env, url)) || (await fetchCaption(url));
+    const caption = [messageText, pageText].filter(Boolean).join('\n').slice(0, MAX_CAPTION_LENGTH);
     const { places, isAiPending } = await analysePost(env, listId, caption);
     // Never lose a link: if AI found nothing, save the bare link for manual editing (or a later retry).
     const post = { list_id: listId, url, caption, source: 'line', line_message_id: event.message.id };

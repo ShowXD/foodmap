@@ -125,6 +125,21 @@ test('links skipped over the limit are analysed later, while today\'s AI count h
   ]);
 });
 
+test('text typed with a link and the post\'s own text both reach the AI and are saved', async () => {
+  const prompts = [];
+  const { DB, send } = setup({ run: async (_model, { messages }) => { prompts.push(messages[1].content); return { response: { places: [{ name: '心焰鐵板燒' }] } }; } });
+  DB.sqlite.exec(`INSERT INTO line_groups (group_id, list_id) VALUES ('${GROUP}', 1)`);
+  const og = '<meta property="og:description" content="台中新開一間西式鐵板燒">';
+  globalThis.fetch = async () => new Response(og, { headers: { 'content-type': 'text/html' } });
+  try {
+    await send([textEvent('t1', '心焰鐵板燒 文心路四段938號 https://www.threads.com/@a/post/x')]);
+  } finally {
+    globalThis.fetch = async () => new Response('', { status: 404 });
+  }
+  assert.match(prompts[0], /心焰鐵板燒 文心路四段938號\n台中新開一間西式鐵板燒/);
+  assert.equal(DB.sqlite.prepare("SELECT caption FROM places WHERE line_message_id = 't1'").get().caption, '心焰鐵板燒 文心路四段938號\n台中新開一間西式鐵板燒');
+});
+
 test('links are never lost: AI failure or no caption saves the bare link', async () => {
   const failingAI = { run: async () => { throw new Error('quota'); } };
   const { DB, send, places } = setup(failingAI);
