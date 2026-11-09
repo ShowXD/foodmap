@@ -10,6 +10,7 @@ import * as placeSearch from '../functions/api/place-search.js';
 import * as placeLocation from '../functions/api/place-location.js';
 import * as placeRating from '../functions/api/place-rating.js';
 import { onRequestPost as lineWebhook } from '../functions/api/line/webhook.js';
+import { locateAutomatically } from '../lib/place-ai.js';
 
 const KEY = 'test-places-key';
 const GOOGLE_ID = 'ChIJ_test_place_0001';
@@ -53,6 +54,10 @@ test('isSameShop: one name contains the other, ignoring spaces and punctuation',
   assert.ok(isSameShop('林東芳牛肉麵（八德店）', '林東芳牛肉麵'));
   assert.ok(!isSameShop('阿宗麵線', '林東芳'));
   assert.ok(!isSameShop('店', '店'));
+  // Worded differently by the post and by Google: a shared run of 3+ characters covering half the shorter name.
+  assert.ok(isSameShop('添好運港點', '添好運 Tim Ho Wan 台中'));
+  assert.ok(!isSameShop('李記蒸餃', '李記水餃'), 'only two characters shared');
+  assert.ok(!isSameShop('添好運港點', '好運來海鮮餐廳快炒'), 'shared run too short for the names');
 });
 
 test('place search: list members only, 503 without a key, 429 when Google quota is used up', async () => {
@@ -258,6 +263,22 @@ test('AI 重新分析 with no saved post text reads the post again and keeps it'
     assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 51 } })).status, 422, 'nothing to read again');
   } finally {
     globalThis.fetch = mocked;
+    googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
+  }
+});
+
+test('auto-locating takes the first of Google\'s hits that matches, not only the top one', async () => {
+  const { DB, env, row } = await setup();
+  const other = { id: 'ChIJ_other_place_0002', displayName: { text: '台中好吃海鮮快炒' }, formattedAddress: '台中市西區公益路1號', location: { latitude: 24.1, longitude: 120.6 } };
+  googleReply = () => Response.json({ places: [other, { ...googleHit('添好運 Tim Ho Wan 台中'), formattedAddress: '台中市西區' }] });
+  DB.sqlite.exec("INSERT INTO places (id, list_id, url, name, area) VALUES (60, 1, 'https://fb.watch/t', '添好運港點', '台中')");
+  try {
+    assert.equal(await locateAutomatically(env, 60, row(60)), true);
+    assert.equal(row(60).google_place_id, GOOGLE_ID);
+    googleReply = () => Response.json({ places: [other] });
+    DB.sqlite.exec("UPDATE places SET lat = NULL, lng = NULL, google_place_id = NULL WHERE id = 60");
+    assert.equal(await locateAutomatically(env, 60, row(60)), false, 'no hit matches: left for a person to pick');
+  } finally {
     googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
   }
 });
