@@ -1,8 +1,21 @@
 // The Google map: shop pins, my position, the 幾公里內 range, placing a pin by hand and finding a shop on Google.
-import { $, api, openDialog } from './shared.js';
+import { $, api, openDialog, readSetting, saveSetting } from './shared.js';
 import { formatDistance, isLocated, latLngOf, matchesFilter, state } from './state.js';
 
 const TAIWAN = { lat: 23.7, lng: 120.96 };
+
+// Where the person was last seen, kept on this device only: the map opens there instead of on all of
+// Taiwan and then jumping, the way Google Maps does. Rounded to ~100 m; the live fix refines it.
+const LAST_POSITION_KEY = 'foodmap.lastPosition';
+function lastPosition() {
+  try {
+    const position = JSON.parse(readSetting(LAST_POSITION_KEY));
+    return Number.isFinite(position?.lat) && Number.isFinite(position?.lng) ? position : null;
+  } catch {
+    return null;
+  }
+}
+const rememberPosition = ({ lat, lng }) => saveSetting(LAST_POSITION_KEY, JSON.stringify({ lat: +lat.toFixed(3), lng: +lng.toFixed(3) }));
 
 // What the map needs from the page around it; app.js hands these over once with connectMap.
 let page = null;
@@ -61,9 +74,10 @@ async function initMap() {
   markerLibrary = library;
   $('map').hidden = false;
   $('map-fallback').hidden = true;
+  const start = state.myPosition ?? lastPosition();
   map = new GoogleMap($('map'), {
-    center: TAIWAN,
-    zoom: 7,
+    center: start ?? TAIWAN,
+    zoom: start ? 15 : 7,
     mapId: config.mapId,
     gestureHandling: 'greedy', // one finger pans, which is what phone users expect
     disableDefaultUI: true,
@@ -165,6 +179,7 @@ export function watchMyPosition() {
       const isFirstFix = !state.myPosition;
       state.myPosition = { lat: position.coords.latitude, lng: position.coords.longitude };
       state.myAccuracy = position.coords.accuracy;
+      rememberPosition(state.myPosition);
       showMyPosition(isFirstFix);
       if (isFirstFix) page.onFirstPosition(); // distances and the 附近 chip appear
     },
