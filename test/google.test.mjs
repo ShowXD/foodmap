@@ -232,6 +232,11 @@ test('沒定位: AI re-analysis replaces the name Google couldn\'t match, but ke
   assert.deepEqual([replaced.status, replaced.body.located], [200, true]);
   assert.deepEqual([row(41).name, row(41).google_place_id], ['江家餛飩麵', GOOGLE_ID]);
   assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 41 } })).status, 409, 'on the map now');
+
+  // Coordinates expired under the 30-day terms: it is refetched by its place ID, never renamed by AI.
+  DB.sqlite.exec("UPDATE places SET lat = NULL, lng = NULL, name = '江家' WHERE id = 41");
+  assert.equal((await call(reanalyze.onRequestPost, mom, { body: { place_id: 41 } })).status, 409, 'expired Google location');
+  assert.equal(row(41).name, '江家');
   googleReply = () => Response.json({ places: [googleHit('阿宗麵線 台南店')] });
 });
 

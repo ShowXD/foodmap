@@ -14,8 +14,9 @@ export async function onRequestPost({ request, env, data }) {
   const place = await env.DB.prepare('SELECT * FROM places WHERE id = ?').bind(access.id).first();
   // Nameless places, and places whose name/address/area look garbled (see garbledFields).
   const garbled = garbledFields(place);
-  // Named but not on the map (沒定位): the AI may read the post better this time.
-  const isUnlocated = Boolean(place.name) && place.lat == null;
+  // Named but never placed (沒定位): the AI may read the post better this time. A Google place whose
+  // coordinates only expired (30-day terms) keeps its place ID and is refetched, never re-analysed.
+  const isUnlocated = Boolean(place.name) && place.lat == null && !place.google_place_id;
   if (place.name && garbled.length === 0 && !isUnlocated) return json({ error: '這家店已經有店名和定位了' }, 409);
   if (!place.caption) return json({ error: '沒有存到貼文文字，請按「編輯」貼上貼文後用 AI 自動填入' }, 422);
   if (!(await takeUserQuota(env.DB, data.user.id, 'workers_ai'))) {
