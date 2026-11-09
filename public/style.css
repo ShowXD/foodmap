@@ -276,9 +276,11 @@ body:has(#drag-bar:not([hidden])) .map-controls { display: none; }
 @media (min-width: 600px) { .place-grid { grid-template-columns: repeat(3, 1fr); } }
 /* Shops off screen are not laid out or painted until scrolled near: switching to the list used to lay out
    every shop at once (~150 ms for 125 shops on a slow phone), right as the page-slide animation started.
-   The sizes are placeholders until a shop has been shown once; `auto` then remembers its real size. */
-.place-rows > li { content-visibility: auto; contain-intrinsic-size: auto 72px; }
-.place-grid > li { content-visibility: auto; contain-intrinsic-size: auto 290px; }
+   The first screenful is always laid out, so it is ready in the first frame instead of in a second layout
+   pass that lands mid-animation. The sizes are placeholders until a shop has been shown once; `auto` then
+   remembers its real size. */
+.place-rows > li:nth-child(n + 13) { content-visibility: auto; contain-intrinsic-size: auto 72px; }
+.place-grid > li:nth-child(n + 13) { content-visibility: auto; contain-intrinsic-size: auto 290px; }
 .row, .tile {
   width: 100%;
   min-height: 0;
